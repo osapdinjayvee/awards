@@ -46,18 +46,18 @@ returns boolean language sql immutable parallel safe as $$
 $$;
 
 -- ---------- Tables ----------
-create table public.voters (
+create table if not exists public.voters (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references public.events (id) on delete cascade,
   id_number text not null,
   full_name text not null,
   created_at timestamptz not null default now()
 );
-create unique index uq_voters_event_id_number
+create unique index if not exists uq_voters_event_id_number
   on public.voters (event_id, public.normalize_id(id_number));
-create index idx_voters_event on public.voters (event_id);
+create index if not exists idx_voters_event on public.voters (event_id);
 
-create table public.votes (
+create table if not exists public.votes (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references public.events (id) on delete cascade,
   category_id uuid not null references public.award_categories (id) on delete cascade,
@@ -72,29 +72,38 @@ create table public.votes (
     (nominee_person_id is not null and section is not null)
   )
 );
-create unique index uq_votes_once
-  on public.votes (category_id, voter_id, coalesce(section::text, '_team'));
-create index idx_votes_category on public.votes (category_id);
-create index idx_votes_event on public.votes (event_id);
+-- one vote per (voter, category, section); enum casts are not immutable,
+-- so use two partial indexes instead of a coalesce(section::text, ...) expression
+create unique index if not exists uq_votes_once_person
+  on public.votes (category_id, voter_id, section)
+  where section is not null;
+create unique index if not exists uq_votes_once_team
+  on public.votes (category_id, voter_id)
+  where section is null;
+create index if not exists idx_votes_category on public.votes (category_id);
+create index if not exists idx_votes_event on public.votes (event_id);
 
-create table public.verify_attempts (
+create table if not exists public.verify_attempts (
   id bigint generated always as identity primary key,
   event_id uuid not null,
   id_norm text not null,
   ok boolean not null,
   created_at timestamptz not null default now()
 );
-create index idx_verify_attempts on public.verify_attempts (event_id, id_norm, created_at);
+create index if not exists idx_verify_attempts on public.verify_attempts (event_id, id_norm, created_at);
 
 -- ---------- RLS: RPC-only for anon; admins full access ----------
 alter table public.voters enable row level security;
 alter table public.votes enable row level security;
 alter table public.verify_attempts enable row level security;
 
+drop policy if exists "admin full access voters" on public.voters;
 create policy "admin full access voters" on public.voters
   for all to authenticated using (true) with check (true);
+drop policy if exists "admin full access votes" on public.votes;
 create policy "admin full access votes" on public.votes
   for all to authenticated using (true) with check (true);
+drop policy if exists "admin read verify_attempts" on public.verify_attempts;
 create policy "admin read verify_attempts" on public.verify_attempts
   for select to authenticated using (true);
 -- (no anon policies: all anon access goes through the security-definer RPCs)
@@ -262,6 +271,6 @@ grant execute on function public.vote_counts(uuid) to anon, authenticated;
 
 -- ---------- Test voters (remove before go-live) ----------
 insert into public.voters (event_id, id_number, full_name) values
-('11111111-1111-4111-8111-111111111111', 'EMP-0001', 'Osapdin, Jayvee M.'),
-('11111111-1111-4111-8111-111111111111', 'EMP-0002', 'Dela Cruz, Juan Santos'),
-('11111111-1111-4111-8111-111111111111', 'EMP-0003', 'Braña, Jolly O.');
+('11111111-1111-4111-8111-111111111111', 'MMC-25084', 'Osapdin, Jayvee M.'),
+('11111111-1111-4111-8111-111111111111', 'MMC-25085', 'Braña, Jolly O.')
+on conflict do nothing;
