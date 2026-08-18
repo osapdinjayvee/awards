@@ -3,20 +3,13 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { Link, useNavigate, useOutletContext, useParams } from "react-router"
 import { toast } from "sonner"
-import { ArrowLeft, Loader2, Send } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Loader2, Send } from "lucide-react"
 import { z } from "zod"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase"
 import {
   eventIsOpen,
@@ -29,6 +22,8 @@ import { NomineeCombobox } from "./nominee-combobox"
 
 type Ctx = { event: AwardEvent; categories: CategoryWithCriteria[] }
 
+const MIN_JUSTIFICATION = 50
+
 const schema = z.object({
   nominator_name: z.string().trim().min(2, "Please enter your name").max(200),
   nominator_email: z.string().trim().email("Please enter a valid email"),
@@ -36,12 +31,43 @@ const schema = z.object({
   justification: z
     .string()
     .trim()
-    .min(50, "Please write at least 50 characters so the committee can evaluate the nomination")
+    .min(
+      MIN_JUSTIFICATION,
+      `Please write at least ${MIN_JUSTIFICATION} characters so the committee can evaluate the nomination`,
+    )
     .max(5000, "Justification must be 5000 characters or fewer"),
   website: z.string().max(0).optional(), // honeypot — must stay empty
 })
 
 type FormValues = z.infer<typeof schema>
+
+function Step({
+  number,
+  title,
+  hint,
+  children,
+}: {
+  number: number
+  title: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="relative pl-12">
+      <span
+        aria-hidden="true"
+        className="absolute left-0 top-0 flex size-8 items-center justify-center rounded-full bg-primary font-heading text-sm font-semibold text-primary-foreground"
+      >
+        {number}
+      </span>
+      <h2 className="pt-1 font-heading text-lg font-semibold tracking-tight">
+        {title}
+      </h2>
+      {hint && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
+      <div className="mt-4 space-y-4">{children}</div>
+    </section>
+  )
+}
 
 export function NominationForm() {
   const { categoryId } = useParams()
@@ -165,75 +191,58 @@ export function NominationForm() {
   }
 
   const justification = form.watch("justification")
+  const minReached = justification.trim().length >= MIN_JUSTIFICATION
   const errors = form.formState.errors
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-6 py-10">
-      <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link to={`/e/${event.slug}`}>
-          <ArrowLeft className="size-4" />
-          {event.title}
-        </Link>
-      </Button>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle>{category.name}</CardTitle>
-            <Badge variant="outline">{isTeam ? "Team / Unit" : "Individual"}</Badge>
-          </div>
-          {category.description && (
-            <CardDescription>{category.description}</CardDescription>
-          )}
-        </CardHeader>
-        {category.criteria.length > 0 && (
-          <CardContent>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              The committee evaluates against these criteria
-            </p>
-            <ul className="space-y-1 text-sm">
+    <div className="min-h-svh bg-background">
+      {/* Category context header */}
+      <div className="border-b bg-secondary/60">
+        <div className="mx-auto max-w-2xl px-6 py-8">
+          <Button asChild variant="ghost" size="sm" className="-ml-3 mb-3">
+            <Link to={`/e/${event.slug}`}>
+              <ArrowLeft className="size-4" />
+              All awards
+            </Link>
+          </Button>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            {isTeam ? "Team / unit nomination" : "Individual nomination"}
+          </p>
+          <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
+            {category.name}
+          </h1>
+          {category.criteria.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {category.criteria.map((cr) => (
-                <li key={cr.id} className="flex justify-between gap-3">
-                  <span>{cr.name}</span>
-                  <span className="shrink-0 font-medium tabular-nums">
+                <span
+                  key={cr.id}
+                  className="rounded-full border bg-card px-2.5 py-0.5 text-xs text-muted-foreground"
+                >
+                  {cr.name}{" "}
+                  <span className="font-medium text-foreground">
                     {Number(cr.weight)}%
                   </span>
-                </li>
+                </span>
               ))}
-            </ul>
-          </CardContent>
-        )}
-      </Card>
-
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="nominator_name">Your name</Label>
-            <Input
-              id="nominator_name"
-              autoComplete="name"
-              {...form.register("nominator_name")}
-            />
-            {errors.nominator_name && (
-              <p className="text-sm text-destructive">{errors.nominator_name.message}</p>
-            )}
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="nominator_email">Your email</Label>
-            <Input
-              id="nominator_email"
-              type="email"
-              autoComplete="email"
-              {...form.register("nominator_email")}
-            />
-            {errors.nominator_email && (
-              <p className="text-sm text-destructive">{errors.nominator_email.message}</p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+      </div>
 
-        <div className="grid gap-2">
-          <Label>{isTeam ? "Unit or office to nominate" : "Person to nominate"}</Label>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="mx-auto max-w-2xl space-y-10 px-6 py-10"
+        noValidate
+      >
+        <Step
+          number={1}
+          title={isTeam ? "Which unit are you nominating?" : "Who are you nominating?"}
+          hint={
+            isTeam
+              ? "Pick the department, office, or committee."
+              : "Search by name — the list only shows people eligible for this award."
+          }
+        >
           {isTeam ? (
             <NomineeCombobox
               mode="unit"
@@ -257,31 +266,85 @@ export function NominationForm() {
           {errors.nominee_id && (
             <p className="text-sm text-destructive">{errors.nominee_id.message}</p>
           )}
-        </div>
+        </Step>
 
-        <div className="grid gap-2">
-          <div className="flex items-baseline justify-between">
-            <Label htmlFor="justification">Justification</Label>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {justification.length}/5000
-            </span>
+        <Step
+          number={2}
+          title="Why do they deserve it?"
+          hint="Speak to the criteria above — specific moments and examples carry more weight than general praise."
+        >
+          <div className="grid gap-2">
+            <Textarea
+              id="justification"
+              rows={8}
+              aria-label="Justification"
+              placeholder="Tell the committee what makes this nominee exceptional..."
+              {...form.register("justification")}
+            />
+            <div className="flex items-center justify-between text-xs">
+              <span
+                className={cn(
+                  "flex items-center gap-1",
+                  minReached ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                {minReached && <CheckCircle2 className="size-3.5" />}
+                {minReached
+                  ? "Minimum reached"
+                  : `At least ${MIN_JUSTIFICATION} characters`}
+              </span>
+              <span className="tabular-nums text-muted-foreground">
+                {justification.length}/5000
+              </span>
+            </div>
+            {errors.justification && (
+              <p className="text-sm text-destructive">
+                {errors.justification.message}
+              </p>
+            )}
           </div>
-          <Textarea
-            id="justification"
-            rows={8}
-            placeholder="Explain how the nominee meets the criteria above. Be specific — concrete examples help the committee."
-            {...form.register("justification")}
+          <AttachmentUploader
+            files={files}
+            onChange={setFiles}
+            onError={(m) => toast.error(m)}
           />
-          {errors.justification && (
-            <p className="text-sm text-destructive">{errors.justification.message}</p>
-          )}
-        </div>
+        </Step>
 
-        <AttachmentUploader
-          files={files}
-          onChange={setFiles}
-          onError={(m) => toast.error(m)}
-        />
+        <Step
+          number={3}
+          title="About you"
+          hint="So the committee can verify the nomination. Your details stay with the committee."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="nominator_name">Your name</Label>
+              <Input
+                id="nominator_name"
+                autoComplete="name"
+                {...form.register("nominator_name")}
+              />
+              {errors.nominator_name && (
+                <p className="text-sm text-destructive">
+                  {errors.nominator_name.message}
+                </p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="nominator_email">Your email</Label>
+              <Input
+                id="nominator_email"
+                type="email"
+                autoComplete="email"
+                {...form.register("nominator_email")}
+              />
+              {errors.nominator_email && (
+                <p className="text-sm text-destructive">
+                  {errors.nominator_email.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </Step>
 
         {/* honeypot — hidden from humans, tempting to bots */}
         <div className="absolute -left-[9999px] top-auto" aria-hidden="true">
@@ -295,17 +358,24 @@ export function NominationForm() {
           />
         </div>
 
-        <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
-          {submitting ? (
-            <>
-              <Loader2 className="size-4 animate-spin" /> Submitting...
-            </>
-          ) : (
-            <>
-              <Send className="size-4" /> Submit nomination
-            </>
-          )}
-        </Button>
+        <div className="border-t pt-6">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={submitting}
+            className="w-full rounded-full sm:w-auto sm:px-10"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" /> Submitting...
+              </>
+            ) : (
+              <>
+                <Send className="size-4" /> Submit nomination
+              </>
+            )}
+          </Button>
+        </div>
       </form>
     </div>
   )

@@ -1,16 +1,6 @@
 import { Link, useOutletContext } from "react-router"
-import { CalendarDays, Users, User } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { ArrowDown, CalendarDays, Users, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import { brandingUrl } from "@/lib/theme"
 import {
   EMPLOYMENT_GROUP_LABELS,
@@ -18,6 +8,7 @@ import {
   type AwardEvent,
   type CategoryWithCriteria,
 } from "@/lib/types"
+import { CriteriaBar } from "./criteria-bar"
 
 type Ctx = { event: AwardEvent; categories: CategoryWithCriteria[] }
 
@@ -25,6 +16,39 @@ function daysLeft(closesAt: string | null): number | null {
   if (!closesAt) return null
   const ms = new Date(closesAt).getTime() - Date.now()
   return ms > 0 ? Math.ceil(ms / 86_400_000) : null
+}
+
+/** Concentric medal-seal ornament for the hero. Purely decorative. */
+function MedalSeal({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 400 400"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+    >
+      <circle cx="200" cy="200" r="196" strokeWidth="1" opacity="0.35" />
+      <circle
+        cx="200"
+        cy="200"
+        r="168"
+        strokeWidth="1.5"
+        strokeDasharray="2 7"
+        opacity="0.5"
+      />
+      <circle cx="200" cy="200" r="136" strokeWidth="1" opacity="0.4" />
+      <circle
+        cx="200"
+        cy="200"
+        r="104"
+        strokeWidth="22"
+        strokeDasharray="1 5"
+        opacity="0.25"
+      />
+      <circle cx="200" cy="200" r="64" strokeWidth="1" opacity="0.5" />
+    </svg>
+  )
 }
 
 export function EventLanding() {
@@ -35,134 +59,154 @@ export function EventLanding() {
   const remaining = daysLeft(event.closes_at)
 
   return (
-    <div className="min-h-svh bg-background pb-16">
-      {/* Hero */}
+    <div className="min-h-svh bg-background pb-20">
+      {/* ---- Hero ---- */}
       <header
-        className="relative border-b bg-primary text-primary-foreground"
-        style={
-          banner
-            ? {
-                backgroundImage: `linear-gradient(color-mix(in oklab, var(--primary) 75%, transparent), color-mix(in oklab, var(--primary) 92%, black)), url(${banner})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
+        className="relative isolate overflow-hidden text-primary-foreground"
+        style={{
+          background: banner
+            ? `linear-gradient(color-mix(in oklab, var(--primary) 82%, transparent), color-mix(in oklab, var(--primary) 94%, black)), url(${banner}) center / cover`
+            : `linear-gradient(160deg, color-mix(in oklab, var(--primary) 92%, white) 0%, var(--primary) 55%, color-mix(in oklab, var(--primary) 80%, black) 100%)`,
+        }}
       >
-        <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 px-6 py-16 text-center">
+        <MedalSeal className="pointer-events-none absolute -right-24 -top-24 size-[26rem] text-white/20 sm:-right-12" />
+        <MedalSeal className="pointer-events-none absolute -bottom-40 -left-32 size-[22rem] text-white/10" />
+
+        <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-5 px-6 pb-20 pt-16 text-center sm:pb-24 sm:pt-20">
           {logo && (
             <img
               src={logo}
               alt=""
-              className="size-20 rounded-full bg-white/90 object-contain p-1 shadow-md"
+              className="rise-in size-20 rounded-full bg-white/95 object-contain p-1.5 shadow-lg"
             />
           )}
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+
+          <div className="rise-in flex flex-wrap items-center justify-center gap-2 text-xs font-medium tracking-wide">
+            <span
+              className={
+                "rounded-full border border-white/25 bg-white/10 px-3 py-1 backdrop-blur-sm" +
+                (open ? "" : " opacity-80")
+              }
+            >
+              {open ? "Nominations open" : "Nominations closed"}
+            </span>
+            {open && remaining !== null && (
+              <span className="flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-1 backdrop-blur-sm">
+                <CalendarDays className="size-3.5" />
+                {remaining === 1 ? "Closes today" : `${remaining} days left`}
+              </span>
+            )}
+          </div>
+
+          <h1 className="rise-in rise-in-delay-1 text-balance font-heading text-4xl font-semibold tracking-tight sm:text-6xl">
             {event.title}
           </h1>
+
           {event.welcome_text && (
-            <p className="max-w-2xl text-sm/relaxed opacity-90">
+            <p className="rise-in rise-in-delay-2 max-w-xl text-pretty text-sm/relaxed text-white/85 sm:text-base/relaxed">
               {event.welcome_text}
             </p>
           )}
-          <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-            {open ? (
-              <>
-                <Badge variant="secondary">Nominations open</Badge>
-                {remaining !== null && (
-                  <span className="flex items-center gap-1 opacity-90">
-                    <CalendarDays className="size-4" />
-                    {remaining === 1
-                      ? "Closes today"
-                      : `${remaining} days left to nominate`}
-                  </span>
-                )}
-              </>
-            ) : (
-              <Badge variant="secondary">Nominations closed</Badge>
-            )}
-          </div>
+
+          {open && (
+            <Button
+              asChild
+              size="lg"
+              variant="secondary"
+              className="rise-in rise-in-delay-3 mt-2 rounded-full bg-white px-7 text-primary shadow-md hover:bg-white/90"
+            >
+              <a href="#awards">
+                Browse the awards <ArrowDown className="size-4" />
+              </a>
+            </Button>
+          )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6">
+      <main className="mx-auto max-w-5xl px-6">
+        {/* ---- About ---- */}
         {event.description && (
-          <section className="py-10">
-            <h2 className="mb-3 text-lg font-semibold">About</h2>
-            <p className="text-sm/relaxed text-muted-foreground">
+          <section className="mx-auto max-w-2xl py-14 text-center">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              About this recognition
+            </p>
+            <p className="text-pretty text-sm/relaxed text-muted-foreground sm:text-base/relaxed">
               {event.description}
             </p>
           </section>
         )}
 
-        <Separator />
+        {/* ---- Categories ---- */}
+        <section id="awards" className="scroll-mt-8 pb-4 pt-2">
+          <div className="mb-8 text-center">
+            <h2 className="font-heading text-3xl font-semibold tracking-tight">
+              The Awards
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {categories.length} categories · the bar under each award shows
+              how the committee weighs its criteria
+            </p>
+          </div>
 
-        <section className="py-10">
-          <h2 className="mb-6 text-lg font-semibold">Award Categories</h2>
-          <div className="grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             {categories.map((cat) => (
-              <Card key={cat.id} className="flex flex-col">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">{cat.name}</CardTitle>
-                    <Badge variant="outline" className="shrink-0 gap-1">
-                      {cat.type === "team" ? (
-                        <>
-                          <Users className="size-3" /> Team / Unit
-                        </>
-                      ) : (
-                        <>
-                          <User className="size-3" /> Individual
-                        </>
-                      )}
-                    </Badge>
-                  </div>
-                  {cat.description && (
-                    <CardDescription className="line-clamp-4">
-                      {cat.description}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="flex-1 space-y-3">
-                  {cat.criteria.length > 0 && (
-                    <div>
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Criteria
-                      </p>
-                      <ul className="space-y-1.5">
-                        {cat.criteria.map((cr) => (
-                          <li
-                            key={cr.id}
-                            className="flex items-baseline justify-between gap-3 text-sm"
-                          >
-                            <span>{cr.name}</span>
-                            <span className="shrink-0 font-medium tabular-nums text-accent-foreground">
-                              {Number(cr.weight)}%
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+              <article
+                key={cat.id}
+                className="group flex flex-col rounded-2xl border bg-card p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              >
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium">
+                  <span className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-secondary-foreground">
+                    {cat.type === "team" ? (
+                      <>
+                        <Users className="size-3" /> Team / Unit
+                      </>
+                    ) : (
+                      <>
+                        <User className="size-3" /> Individual
+                      </>
+                    )}
+                  </span>
                   {cat.type === "individual" &&
                     cat.eligible_groups &&
                     cat.eligible_groups.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Open to:{" "}
+                      <span className="text-muted-foreground">
                         {cat.eligible_groups
                           .map((g) => EMPLOYMENT_GROUP_LABELS[g])
-                          .join(", ")}
-                      </p>
+                          .join(" · ")}
+                      </span>
                     )}
-                </CardContent>
-                {open && (
-                  <CardFooter>
-                    <Button asChild className="w-full">
-                      <Link to={`nominate/${cat.id}`}>Nominate</Link>
-                    </Button>
-                  </CardFooter>
+                </div>
+
+                <h3 className="font-heading text-xl font-semibold tracking-tight">
+                  {cat.name}
+                </h3>
+
+                {cat.description && (
+                  <p className="mt-2 line-clamp-3 text-sm/relaxed text-muted-foreground">
+                    {cat.description}
+                  </p>
                 )}
-              </Card>
+
+                {cat.criteria.length > 0 && (
+                  <div className="mt-5">
+                    <CriteriaBar criteria={cat.criteria} />
+                  </div>
+                )}
+
+                <div className="mt-auto pt-5">
+                  {open ? (
+                    <Button asChild className="w-full rounded-full">
+                      <Link to={`nominate/${cat.id}`}>
+                        Nominate for this award
+                      </Link>
+                    </Button>
+                  ) : (
+                    <p className="rounded-full border border-dashed py-2 text-center text-xs text-muted-foreground">
+                      Nominations closed
+                    </p>
+                  )}
+                </div>
+              </article>
             ))}
           </div>
         </section>

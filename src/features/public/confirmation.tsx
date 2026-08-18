@@ -1,5 +1,5 @@
 import { Link, useLocation, useOutletContext } from "react-router"
-import { CheckCircle2 } from "lucide-react"
+import { Award, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { AwardEvent, CategoryWithCriteria } from "@/lib/types"
 
@@ -12,29 +12,49 @@ export function Confirmation() {
     | null
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-xl flex-col items-center justify-center gap-4 p-8 text-center">
-      <CheckCircle2 className="size-14 text-primary" />
-      <h1 className="text-2xl font-bold">Nomination submitted</h1>
-      <p className="text-muted-foreground">
-        {state?.nomineeName ? (
-          <>
-            Thank you for nominating <strong>{state.nomineeName}</strong>
-            {state.categoryName && (
-              <>
-                {" "}
-                for <strong>{state.categoryName}</strong>
-              </>
-            )}
-            .
-          </>
-        ) : (
-          "Thank you — your nomination has been received."
-        )}{" "}
-        The committee will review all submissions after nominations close.
-      </p>
-      <Button asChild>
-        <Link to={`/e/${event.slug}`}>Nominate someone else</Link>
-      </Button>
+    <div className="mx-auto flex min-h-svh max-w-xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
+      <div className="rise-in relative">
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 -m-4 rounded-full border border-dashed border-primary/30"
+        />
+        <span className="flex size-20 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
+          <Check className="size-9" strokeWidth={2.5} />
+        </span>
+      </div>
+
+      <div className="rise-in rise-in-delay-1 space-y-3">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+          Nomination submitted
+        </h1>
+        <p className="text-pretty text-muted-foreground">
+          {state?.nomineeName ? (
+            <>
+              Thank you for nominating{" "}
+              <strong className="text-foreground">{state.nomineeName}</strong>
+              {state.categoryName && (
+                <>
+                  {" "}
+                  for the{" "}
+                  <strong className="text-foreground">{state.categoryName}</strong>
+                </>
+              )}
+              .
+            </>
+          ) : (
+            "Thank you — your nomination has been received."
+          )}{" "}
+          The committee reviews every submission after nominations close.
+        </p>
+      </div>
+
+      <div className="rise-in rise-in-delay-2 flex flex-col gap-2 sm:flex-row">
+        <Button asChild size="lg" className="rounded-full px-7">
+          <Link to={`/e/${event.slug}`}>
+            <Award className="size-4" /> Nominate someone else
+          </Link>
+        </Button>
+      </div>
     </div>
   )
 }
