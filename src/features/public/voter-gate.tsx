@@ -1,6 +1,5 @@
 import { useState } from "react"
-import { toast } from "sonner"
-import { IdCard, Loader2 } from "lucide-react"
+import { CircleAlert, IdCard, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -25,22 +24,24 @@ export function VoterGate({
   const verify = useVerifyVoter(event.id)
   const [idNumber, setIdNumber] = useState("")
   const [name, setName] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
     if (!idNumber.trim()) {
-      toast.error("Please enter your ID number.")
+      setError("Please enter your ID number.")
       return
     }
     if (!looksLikeFullName(name)) {
-      toast.error("Please enter your full name (first and last name).")
+      setError("Please enter your full name (first and last name).")
       return
     }
     try {
       const result = await verify.mutateAsync({ idNumber, name })
       onVerified(idNumber, name, result)
     } catch (err) {
-      toast.error(votingErrorMessage(err))
+      setError(votingErrorMessage(err))
     }
   }
 
@@ -90,6 +91,15 @@ export function VoterGate({
               both fine.
             </p>
           </div>
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+            >
+              <CircleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
           <Button type="submit" disabled={verify.isPending} className="w-full">
             {verify.isPending && <Loader2 className="size-4 animate-spin" />}
             Start voting
