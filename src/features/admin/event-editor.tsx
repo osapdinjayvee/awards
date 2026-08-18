@@ -10,6 +10,8 @@ import { CategoriesEditor } from "./categories-editor"
 import { RosterManager } from "./roster-manager"
 import { BrandingEditor } from "./branding-editor"
 import { NominationsViewer } from "./nominations-viewer"
+import { VotersManager } from "./voters-manager"
+import { ResultsViewer } from "./results-viewer"
 
 export function EventEditor() {
   const { id } = useParams()
@@ -49,7 +51,9 @@ export function EventEditor() {
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="roster">Roster</TabsTrigger>
+          <TabsTrigger value="voters">Voters</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
+          <TabsTrigger value="results">Results</TabsTrigger>
           <TabsTrigger value="nominations">Nominations</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="pt-4">
@@ -61,8 +65,14 @@ export function EventEditor() {
         <TabsContent value="roster" className="pt-4">
           <RosterManager eventId={event.id} />
         </TabsContent>
+        <TabsContent value="voters" className="pt-4">
+          <VotersManager eventId={event.id} />
+        </TabsContent>
         <TabsContent value="branding" className="pt-4">
           <BrandingEditor event={event} />
+        </TabsContent>
+        <TabsContent value="results" className="pt-4">
+          <ResultsViewer event={event} />
         </TabsContent>
         <TabsContent value="nominations" className="pt-4">
           <NominationsViewer event={event} />

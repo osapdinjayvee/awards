@@ -1,5 +1,5 @@
 import { Link, useOutletContext } from "react-router"
-import { ArrowDown, CalendarDays, Users, User } from "lucide-react"
+import { ArrowDown, CalendarDays, Users, User, Vote } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { brandingUrl } from "@/lib/theme"
 import {
@@ -88,7 +88,7 @@ export function EventLanding() {
                 (open ? "" : " opacity-80")
               }
             >
-              {open ? "Nominations open" : "Nominations closed"}
+              {open ? "Voting open" : "Voting closed"}
             </span>
             {open && remaining !== null && (
               <span className="flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-1 backdrop-blur-sm">
@@ -109,16 +109,28 @@ export function EventLanding() {
           )}
 
           {open && (
-            <Button
-              asChild
-              size="lg"
-              variant="secondary"
-              className="rise-in rise-in-delay-3 mt-2 rounded-full bg-white px-7 text-primary shadow-md hover:bg-white/90"
-            >
-              <a href="#awards">
-                Browse the awards <ArrowDown className="size-4" />
-              </a>
-            </Button>
+            <div className="rise-in rise-in-delay-3 mt-2 flex flex-col items-center gap-3 sm:flex-row">
+              <Button
+                asChild
+                size="lg"
+                variant="secondary"
+                className="rounded-full bg-white px-8 text-primary shadow-md hover:bg-white/90"
+              >
+                <Link to="vote">
+                  <Vote className="size-4" /> Start voting
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="ghost"
+                className="rounded-full text-white hover:bg-white/10 hover:text-white"
+              >
+                <a href="#awards">
+                  See the awards <ArrowDown className="size-4" />
+                </a>
+              </Button>
+            </div>
           )}
         </div>
       </header>
@@ -143,8 +155,8 @@ export function EventLanding() {
               The Awards
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {categories.length} categories · the bar under each award shows
-              how the committee weighs its criteria
+              {categories.length} categories · each is voted per employment
+              group · the bar shows how its criteria are weighed
             </p>
           </div>
 
@@ -193,22 +205,20 @@ export function EventLanding() {
                   </div>
                 )}
 
-                <div className="mt-auto pt-5">
-                  {open ? (
-                    <Button asChild className="w-full rounded-full">
-                      <Link to={`nominate/${cat.id}`}>
-                        Nominate for this award
-                      </Link>
-                    </Button>
-                  ) : (
-                    <p className="rounded-full border border-dashed py-2 text-center text-xs text-muted-foreground">
-                      Nominations closed
-                    </p>
-                  )}
-                </div>
+
               </article>
             ))}
           </div>
+
+          {open && (
+            <div className="mt-10 text-center">
+              <Button asChild size="lg" className="rounded-full px-10">
+                <Link to="vote">
+                  <Vote className="size-4" /> Start voting
+                </Link>
+              </Button>
+            </div>
+          )}
         </section>
       </main>
     </div>
