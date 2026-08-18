@@ -1,16 +1,16 @@
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabasePublishableKey) {
   throw new Error(
     "Missing Supabase env vars. Copy .env.example to .env.local and fill in " +
-      "VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the dev server.",
+      "VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY, then restart the dev server.",
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabasePublishableKey)
 
 /**
  * Pings the project's REST root to verify the URL and key are both valid.
@@ -18,7 +18,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
  */
 export async function checkSupabaseConnection() {
   const res = await fetch(`${supabaseUrl}/rest/v1/`, {
-    headers: { apikey: supabaseAnonKey },
+    headers: { apikey: supabasePublishableKey },
   })
   if (!res.ok) {
     throw new Error(`${res.status} ${res.statusText}`)
