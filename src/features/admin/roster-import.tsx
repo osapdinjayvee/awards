@@ -41,7 +41,7 @@ const NONE = "__none__"
 function guessGroup(value: string): EmploymentGroup | null {
   const v = value.toLowerCase()
   if (/jo|job\s*order|cos|contract/.test(v)) return "job_order_cos"
-  if (/non[-\s]?teach/.test(v)) return "permanent_non_teaching"
+  if (/non[-_\s]?teach/.test(v)) return "permanent_non_teaching"
   if (/teach|faculty|instructor/.test(v)) return "permanent_teaching"
   if (/perm|regular/.test(v)) return "permanent_non_teaching"
   return null

@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { useLang } from "@/hooks/use-lang"
 import { cn } from "@/lib/utils"
 import type { VoteCount } from "@/lib/types"
 
@@ -51,6 +52,7 @@ export function BallotSection({
   countsLoading: boolean
   disabled: boolean
 }) {
+  const { t } = useLang()
   const [open, setOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
 
@@ -85,13 +87,14 @@ export function BallotSection({
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             {title}
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-              <Check className="size-2.5" strokeWidth={3} /> Submitted
+              <Check className="size-2.5" strokeWidth={3} />{" "}
+              {t("section.submitted")}
             </span>
           </h3>
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
             {countsLoading && !counts
-              ? "Loading..."
-              : `${total} vote${total === 1 ? "" : "s"}`}
+              ? t("common.loading")
+              : t("section.votes", { n: total })}
           </span>
         </div>
 
@@ -111,6 +114,7 @@ export function BallotSection({
                 pct={total > 0 ? Math.round((c.votes / total) * 100) : 0}
                 width={(c.votes / max) * 92}
                 isMine={c.id === votedNomineeId}
+                youLabel={t("section.yourVote")}
               />
             ))}
             {hidden > 0 && (
@@ -120,7 +124,7 @@ export function BallotSection({
                 className="h-8 w-full rounded-full text-xs text-muted-foreground"
                 onClick={() => setShowAll(true)}
               >
-                Show {hidden} more
+                {t("section.showMore", { n: hidden })}
               </Button>
             )}
           </>
@@ -137,7 +141,7 @@ export function BallotSection({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{title}</h3>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {candidates.length} candidate{candidates.length === 1 ? "" : "s"}
+          {t("section.candidates", { n: candidates.length })}
         </span>
       </div>
 
@@ -180,8 +184,8 @@ export function BallotSection({
               ) : (
                 <span className="block truncate text-sm text-muted-foreground">
                   {candidates.length === 0
-                    ? "No candidates in this section yet"
-                    : "Search and choose a nominee"}
+                    ? t("section.empty")
+                    : t("section.choose")}
                 </span>
               )}
             </span>
@@ -194,9 +198,9 @@ export function BallotSection({
           className="w-(--radix-popover-trigger-width) overflow-hidden rounded-2xl p-0 shadow-lg"
         >
           <Command>
-            <CommandInput placeholder="Search by name or position..." />
+            <CommandInput placeholder={t("section.searchPlaceholder")} />
             <CommandList>
-              <CommandEmpty>No match.</CommandEmpty>
+              <CommandEmpty>{t("section.noMatch")}</CommandEmpty>
               <CommandGroup>
                 {candidates.map((c) => (
                   <CommandItem
@@ -237,7 +241,7 @@ export function BallotSection({
           disabled={disabled}
           className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
         >
-          Clear selection
+          {t("section.clear")}
         </button>
       )}
     </section>
@@ -251,6 +255,7 @@ function ResultRow({
   pct,
   width,
   isMine,
+  youLabel,
 }: {
   candidate: Candidate
   rank: number
@@ -258,6 +263,7 @@ function ResultRow({
   pct: number
   width: number
   isMine: boolean
+  youLabel: string
 }) {
   const lead = rank === 1
   return (
@@ -290,7 +296,7 @@ function ResultRow({
             <span className="truncate">{candidate.label}</span>
             {isMine && (
               <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
-                <Check className="size-2.5" strokeWidth={3} /> You
+                <Check className="size-2.5" strokeWidth={3} /> {youLabel}
               </span>
             )}
           </p>

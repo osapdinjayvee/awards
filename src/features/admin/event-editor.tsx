@@ -12,6 +12,7 @@ import { BrandingEditor } from "./branding-editor"
 import { NominationsViewer } from "./nominations-viewer"
 import { VotersManager } from "./voters-manager"
 import { ResultsViewer } from "./results-viewer"
+import { TranslationsEditor } from "./translations-editor"
 import { DeleteEventDialog } from "./delete-event-dialog"
 
 export function EventEditor() {
@@ -70,6 +71,7 @@ export function EventEditor() {
           <TabsTrigger value="roster">Roster</TabsTrigger>
           <TabsTrigger value="voters">Voters</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
+          <TabsTrigger value="translations">Languages</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
           <TabsTrigger value="nominations">Nominations</TabsTrigger>
         </TabsList>
@@ -87,6 +89,9 @@ export function EventEditor() {
         </TabsContent>
         <TabsContent value="branding" className="pt-4">
           <BrandingEditor event={event} />
+        </TabsContent>
+        <TabsContent value="translations" className="pt-4">
+          <TranslationsEditor eventId={event.id} />
         </TabsContent>
         <TabsContent value="results" className="pt-4">
           <ResultsViewer event={event} />

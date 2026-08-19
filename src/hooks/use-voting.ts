@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
+import type { TranslationKey } from "@/lib/i18n"
 import type { EmploymentGroup, VoteCount, VotedEntry } from "@/lib/types"
 
 export interface VerifyResult {
@@ -13,25 +14,22 @@ export interface VerifyResult {
   voted: VotedEntry[]
 }
 
-/** Known RPC error tokens -> human copy. */
-export function votingErrorMessage(err: unknown): string {
+/** Known RPC error tokens -> translation key. */
+export function votingErrorKey(err: unknown): TranslationKey {
   const msg = err instanceof Error ? err.message : String(err)
-  if (msg.includes("not_authorized"))
-    return "We couldn't find you on the voter list. Check your ID number and full name."
-  if (msg.includes("too_many_attempts"))
-    return "Too many failed attempts. Please wait 10 minutes and try again."
-  if (msg.includes("already_voted"))
-    return "You have already voted in this section."
-  if (msg.includes("event_closed")) return "Voting for this event is closed."
-  if (msg.includes("invalid_id")) return "Please enter your ID number."
+  if (msg.includes("not_authorized")) return "err.notAuthorized"
+  if (msg.includes("too_many_attempts")) return "err.tooManyAttempts"
+  if (msg.includes("already_voted")) return "err.alreadyVoted"
+  if (msg.includes("event_closed")) return "err.eventClosed"
+  if (msg.includes("invalid_id")) return "err.invalidId"
   if (
     msg.includes("invalid_vote") ||
     msg.includes("invalid_nominee") ||
     msg.includes("invalid_section") ||
     msg.includes("invalid_category")
   )
-    return "That vote isn't valid for this section. Refresh the page and try again."
-  return "Something went wrong. Please try again."
+    return "err.invalidVote"
+  return "err.generic"
 }
 
 export function useVerifyVoter(eventId: string) {

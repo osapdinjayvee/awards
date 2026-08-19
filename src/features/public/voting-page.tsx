@@ -48,8 +48,11 @@ import {
   useCastVote,
   useVerifyVoter,
   useVoteCountsMany,
-  votingErrorMessage,
+  votingErrorKey,
 } from "@/hooks/use-voting"
+import { useLang } from "@/hooks/use-lang"
+import { localized } from "@/lib/i18n"
+import { LanguageSwitcher } from "@/components/language-switcher"
 import { CriteriaBar } from "./criteria-bar"
 import { VoterGate } from "./voter-gate"
 import { BallotSection, type Candidate } from "./ballot-section"
@@ -59,11 +62,13 @@ type Ctx = { event: AwardEvent; categories: CategoryWithCriteria[] }
 type BallotStep = { category: CategoryWithCriteria; slot: BallotSlot }
 
 /** Employment group for individual awards, division name for team awards. */
-function slotLabel(slot: BallotSlot, divisions: Division[]): string {
+function slotLabel(
+  slot: BallotSlot,
+  divisions: Division[],
+  fallback: string,
+): string {
   if (slot.section) return EMPLOYMENT_GROUP_LABELS[slot.section]
-  return (
-    divisions.find((d) => d.id === slot.divisionId)?.name ?? "Units & Offices"
-  )
+  return divisions.find((d) => d.id === slot.divisionId)?.name ?? fallback
 }
 
 /** Brand-tinted page wash behind the ballot. */
@@ -80,6 +85,7 @@ function PageWash() {
 export function VotingPage() {
   const { event, categories } = useOutletContext<Ctx>()
   const navigate = useNavigate()
+  const { t, lang } = useLang()
   const open = eventIsOpen(event)
 
   const { data: divisions = [], isLoading: divisionsLoading } = useDivisions(
@@ -185,9 +191,11 @@ export function VotingPage() {
     return (
       <div className="relative flex min-h-svh flex-col items-center justify-center gap-3 p-8 text-center">
         <PageWash />
-        <p className="text-muted-foreground">Voting for this event is closed.</p>
+        <p className="text-muted-foreground">{t("ballot.closed")}</p>
         <Button asChild variant="outline" className="rounded-full">
-          <Link to={`/e/${event.slug}`}>Back to {event.title}</Link>
+          <Link to={`/e/${event.slug}`}>
+            {t("common.backTo", { title: event.title })}
+          </Link>
         </Button>
       </div>
     )
@@ -207,7 +215,7 @@ export function VotingPage() {
           saveVoterIdentity(event.id, id)
           setIdentity(id)
           applyVotedList(result.voted)
-          toast.success(`Welcome, ${result.full_name}`)
+          toast.success(t("ballot.welcome", { name: result.full_name }))
         }}
       />
     )
@@ -269,7 +277,7 @@ export function VotingPage() {
         cast.push(entry)
       } catch (err) {
         failures.push(
-          `${step.category.name} — ${slotLabel(step.slot, divisions)}: ${votingErrorMessage(err)}`,
+          `${step.category.name} — ${slotLabel(step.slot, divisions, t("ballot.unitsAndOffices"))}: ${t(votingErrorKey(err))}`,
         )
       }
     }
@@ -300,9 +308,7 @@ export function VotingPage() {
         }
         return next
       })
-      toast.success(
-        `${cast.length} vote${cast.length === 1 ? "" : "s"} submitted. Thank you!`,
-      )
+      toast.success(t("ballot.submitted", { n: cast.length }))
       window.scrollTo({ top: 0, behavior: "smooth" })
     }
 
@@ -310,7 +316,7 @@ export function VotingPage() {
       toast.error(failures[0], {
         description:
           failures.length > 1
-            ? `${failures.length - 1} more failed.`
+            ? t("ballot.moreFailed", { n: failures.length - 1 })
             : undefined,
       })
       // Reconcile with server truth — some sections may already be locked in.
@@ -337,50 +343,52 @@ export function VotingPage() {
               className="-ml-2 h-8 rounded-full px-3 text-muted-foreground"
               onClick={() => navigate(`/e/${event.slug}`)}
             >
-              <ArrowLeft className="size-4" /> Exit
+              <ArrowLeft className="size-4" /> {t("common.exit")}
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <button
-                  type="button"
-                  className="flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1 text-xs transition-colors hover:border-primary/40 hover:bg-card"
-                >
-                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                    {identity.fullName.slice(0, 1)}
-                  </span>
-                  <span className="truncate text-muted-foreground">
-                    {identity.fullName}
-                  </span>
-                  <UserRoundCog className="size-3.5 shrink-0 text-muted-foreground" />
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="rounded-3xl">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="font-heading">
-                    Switch voter?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    You are signed in as {identity.fullName}. Votes you already
-                    submitted stay recorded
-                    {pendingKeys.length > 0
-                      ? `, but ${pendingKeys.length} unsent selection${pendingKeys.length === 1 ? "" : "s"} will be discarded`
-                      : ""}
-                    .
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="rounded-full">
-                    Stay signed in
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    className="rounded-full"
-                    onClick={switchVoter}
+            <div className="flex min-w-0 items-center gap-2">
+              <LanguageSwitcher />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1 text-xs transition-colors hover:border-primary/40 hover:bg-card"
                   >
-                    Switch voter
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                      {identity.fullName.slice(0, 1)}
+                    </span>
+                    <span className="truncate text-muted-foreground">
+                      {identity.fullName}
+                    </span>
+                    <UserRoundCog className="size-3.5 shrink-0 text-muted-foreground" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-3xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-heading">
+                      {t("ballot.switchTitle")}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("ballot.switchBody", { name: identity.fullName })}
+                      {pendingKeys.length > 0
+                        ? t("ballot.switchPending", { n: pendingKeys.length })
+                        : ""}
+                      .
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-full">
+                      {t("ballot.switchStay")}
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className="rounded-full"
+                      onClick={switchVoter}
+                    >
+                      {t("ballot.switchConfirm")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
 
           {/* One segment per section: submitted, selected, or untouched */}
@@ -406,15 +414,16 @@ export function VotingPage() {
           </div>
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span className="font-medium tabular-nums text-foreground">
-              {votedCount}/{steps.length}
+              {t("ballot.progress", { voted: votedCount, total: steps.length })}
             </span>
-            submitted
             {pendingKeys.length > 0 && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium tabular-nums text-primary">
-                {pendingKeys.length} ready to send
+                {t("ballot.readyToSend", { n: pendingKeys.length })}
               </span>
             )}
-            {remaining > 0 && <span>· {remaining} left</span>}
+            {remaining > 0 && (
+              <span>· {t("ballot.left", { n: remaining })}</span>
+            )}
           </p>
         </div>
       </header>
@@ -430,12 +439,10 @@ export function VotingPage() {
             <Sparkles className="size-3.5" /> {event.title}
           </p>
           <h1 className="mt-3 text-balance font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-            {allDone ? "Your ballot is complete" : "Your ballot"}
+            {allDone ? t("ballot.titleDone") : t("ballot.title")}
           </h1>
           <p className="mt-3 max-w-prose text-pretty text-sm/relaxed text-muted-foreground">
-            {allDone
-              ? "Every section is in. The live results below keep updating as others vote."
-              : "Pick one nominee per section, then send them all at once. A submitted section is final."}
+            {allDone ? t("ballot.introDone") : t("ballot.intro")}
           </p>
         </div>
 
@@ -471,17 +478,17 @@ export function VotingPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <h2 className="text-balance font-heading text-lg font-semibold tracking-tight sm:text-xl">
-                        {category.name}
+                        {localized(category, "name", lang)}
                       </h2>
                       {category.description && (
                         <p className="mt-1.5 text-pretty text-sm/relaxed text-muted-foreground">
-                          {category.description}
+                          {localized(category, "description", lang)}
                         </p>
                       )}
                       {category.criteria.length > 0 && (
                         <details className="group mt-3">
                           <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-full border border-border/60 bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground [&::-webkit-details-marker]:hidden">
-                            How this is judged
+                            {t("ballot.howJudged")}
                             <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
                           </summary>
                           <div className="pt-4">
@@ -496,8 +503,7 @@ export function VotingPage() {
                 <div className="divide-y divide-border/60">
                   {slots.length === 0 && (
                     <p className="p-5 text-sm text-muted-foreground sm:p-6">
-                      This award isn't open for voting yet — no divisions have
-                      been set up for it.
+                      {t("ballot.noDivisions")}
                     </p>
                   )}
                   {slots.map((slot) => {
@@ -507,7 +513,11 @@ export function VotingPage() {
                     return (
                       <BallotSection
                         key={key}
-                        title={slotLabel(slot, divisions)}
+                        title={slotLabel(
+                          slot,
+                          divisions,
+                          t("ballot.unitsAndOffices"),
+                        )}
                         candidates={candidatesForSlot(slot)}
                         votedNomineeId={
                           voted
@@ -545,13 +555,13 @@ export function VotingPage() {
               <PartyPopper className="size-6" />
             </span>
             <h2 className="mt-4 font-heading text-xl font-semibold tracking-tight">
-              Thank you for voting
+              {t("ballot.thanksTitle")}
             </h2>
             <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
-              Your ballot for {event.title} is complete.
+              {t("ballot.thanksBody", { title: event.title })}
             </p>
             <Button asChild variant="outline" className="mt-5 rounded-full">
-              <Link to={`/e/${event.slug}`}>Back to the awards</Link>
+              <Link to={`/e/${event.slug}`}>{t("common.backToAwards")}</Link>
             </Button>
           </div>
         )}
@@ -564,9 +574,9 @@ export function VotingPage() {
             <p className="min-w-0 flex-1 text-xs/snug text-muted-foreground">
               {pendingKeys.length === 0
                 ? remaining > 0
-                  ? `Choose a nominee in any of the ${remaining} open section${remaining === 1 ? "" : "s"}.`
-                  : "Nothing left to submit."
-                : `${pendingKeys.length} section${pendingKeys.length === 1 ? "" : "s"} ready to send`}
+                  ? t("ballot.dockEmpty", { n: remaining })
+                  : t("ballot.dockNothing")
+                : t("ballot.dockReady", { n: pendingKeys.length })}
             </p>
             <Button
               size="lg"
@@ -579,7 +589,7 @@ export function VotingPage() {
               ) : (
                 <Vote className="size-4" />
               )}
-              Submit{pendingKeys.length > 0 ? ` ${pendingKeys.length}` : ""}
+              {t("ballot.submit", { n: pendingKeys.length })}
             </Button>
           </div>
         </div>

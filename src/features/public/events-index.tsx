@@ -8,9 +8,12 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useOpenEvents } from "@/hooks/use-event"
+import { useLang } from "@/hooks/use-lang"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 export function EventsIndex() {
   const { data: events, isLoading } = useOpenEvents()
+  const { t } = useLang()
 
   if (isLoading) {
     return (
@@ -29,12 +32,15 @@ export function EventsIndex() {
     <div className="mx-auto flex min-h-svh max-w-xl flex-col justify-center gap-6 p-8">
       <div className="flex items-center gap-3">
         <Award className="size-8 text-primary" />
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Award Nominations</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+          {t("index.title")}
+        </h1>
+        <div className="ml-auto">
+          <LanguageSwitcher />
+        </div>
       </div>
       {!events || events.length === 0 ? (
-        <p className="text-muted-foreground">
-          There are no open nomination events right now.
-        </p>
+        <p className="text-muted-foreground">{t("index.empty")}</p>
       ) : (
         <div className="space-y-3">
           {events.map((e) => (

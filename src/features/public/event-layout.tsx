@@ -3,9 +3,11 @@ import { Outlet, useParams } from "react-router"
 import { useEventBySlug } from "@/hooks/use-event"
 import { applyEventTheme } from "@/lib/theme"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useLang } from "@/hooks/use-lang"
 
 export function EventLayout() {
   const { eventSlug } = useParams()
+  const { t } = useLang()
   const { data, isLoading, isError } = useEventBySlug(eventSlug)
   const event = data?.event
 
@@ -31,10 +33,8 @@ export function EventLayout() {
   if (isError) {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-2 p-8 text-center">
-        <h1 className="text-2xl font-semibold">Something went wrong</h1>
-        <p className="text-muted-foreground">
-          We couldn't load this event. Please try again in a moment.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("layout.errorTitle")}</h1>
+        <p className="text-muted-foreground">{t("layout.errorBody")}</p>
       </div>
     )
   }
@@ -43,9 +43,7 @@ export function EventLayout() {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-2 p-8 text-center">
         <h1 className="text-4xl font-bold">404</h1>
-        <p className="text-muted-foreground">
-          This award event doesn't exist or isn't published.
-        </p>
+        <p className="text-muted-foreground">{t("layout.notFound")}</p>
       </div>
     )
   }

@@ -8,6 +8,9 @@ import {
   type AwardEvent,
   type CategoryWithCriteria,
 } from "@/lib/types"
+import { useLang } from "@/hooks/use-lang"
+import { localized } from "@/lib/i18n"
+import { LanguageSwitcher } from "@/components/language-switcher"
 import { CriteriaBar } from "./criteria-bar"
 
 type Ctx = { event: AwardEvent; categories: CategoryWithCriteria[] }
@@ -53,6 +56,7 @@ function MedalSeal({ className }: { className?: string }) {
 
 export function EventLanding() {
   const { event, categories } = useOutletContext<Ctx>()
+  const { t, lang } = useLang()
   const open = eventIsOpen(event)
   const logo = eventLogo(event)
   const banner = brandingUrl(event.banner_path)
@@ -69,6 +73,9 @@ export function EventLanding() {
             : `linear-gradient(160deg, color-mix(in oklab, var(--primary) 92%, white) 0%, var(--primary) 55%, color-mix(in oklab, var(--primary) 80%, black) 100%)`,
         }}
       >
+        <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
+          <LanguageSwitcher tone="light" />
+        </div>
         <MedalSeal className="pointer-events-none absolute -right-24 -top-24 size-[26rem] text-white/20 sm:-right-12" />
         <MedalSeal className="pointer-events-none absolute -bottom-40 -left-32 size-[22rem] text-white/10" />
 
@@ -86,12 +93,14 @@ export function EventLanding() {
                 (open ? "" : " opacity-80")
               }
             >
-              {open ? "Voting open" : "Voting closed"}
+              {open ? t("landing.votingOpen") : t("landing.votingClosed")}
             </span>
             {open && remaining !== null && (
               <span className="flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-1 backdrop-blur-sm">
                 <CalendarDays className="size-3.5" />
-                {remaining === 1 ? "Closes today" : `${remaining} days left`}
+                {remaining === 1
+                  ? t("landing.closesToday")
+                  : t("landing.daysLeft", { n: remaining })}
               </span>
             )}
           </div>
@@ -102,7 +111,7 @@ export function EventLanding() {
 
           {event.welcome_text && (
             <p className="rise-in rise-in-delay-2 max-w-xl text-pretty text-sm/relaxed text-white/85 sm:text-base/relaxed">
-              {event.welcome_text}
+              {localized(event, "welcome_text", lang)}
             </p>
           )}
 
@@ -115,7 +124,7 @@ export function EventLanding() {
                 className="rounded-full bg-white px-8 text-primary shadow-md hover:bg-white/90"
               >
                 <Link to="vote">
-                  <Vote className="size-4" /> Start voting
+                  <Vote className="size-4" /> {t("common.startVoting")}
                 </Link>
               </Button>
               <Button
@@ -125,7 +134,7 @@ export function EventLanding() {
                 className="rounded-full text-white hover:bg-white/10 hover:text-white"
               >
                 <a href="#awards">
-                  See the awards <ArrowDown className="size-4" />
+                  {t("landing.seeAwards")} <ArrowDown className="size-4" />
                 </a>
               </Button>
             </div>
@@ -138,10 +147,10 @@ export function EventLanding() {
         {event.description && (
           <section className="mx-auto max-w-2xl py-14 text-center">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              About this recognition
+              {t("landing.aboutEyebrow")}
             </p>
             <p className="text-pretty text-sm/relaxed text-muted-foreground sm:text-base/relaxed">
-              {event.description}
+              {localized(event, "description", lang)}
             </p>
           </section>
         )}
@@ -150,12 +159,10 @@ export function EventLanding() {
         <section id="awards" className="scroll-mt-8 pb-4 pt-2">
           <div className="mb-8 text-center">
             <h2 className="font-heading text-3xl font-semibold tracking-tight">
-              The Awards
+              {t("landing.awardsTitle")}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {categories.length} categories · individual awards are voted per
-              employment group, the team award per division · the bar shows how
-              its criteria are weighed
+              {t("landing.awardsSubtitle", { n: categories.length })}
             </p>
           </div>
 
@@ -169,17 +176,17 @@ export function EventLanding() {
                   <span className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-secondary-foreground">
                     {cat.type === "team" ? (
                       <>
-                        <Users className="size-3" /> Team / Unit
+                        <Users className="size-3" /> {t("landing.teamBadge")}
                       </>
                     ) : (
                       <>
-                        <User className="size-3" /> Individual
+                        <User className="size-3" /> {t("landing.individualBadge")}
                       </>
                     )}
                   </span>
                   {cat.type === "team" ? (
                     <span className="text-muted-foreground">
-                      One winner per division
+                      {t("landing.perDivision")}
                     </span>
                   ) : (
                     cat.eligible_groups &&
@@ -194,12 +201,12 @@ export function EventLanding() {
                 </div>
 
                 <h3 className="font-heading text-xl font-semibold tracking-tight">
-                  {cat.name}
+                  {localized(cat, "name", lang)}
                 </h3>
 
                 {cat.description && (
                   <p className="mt-2 line-clamp-3 text-sm/relaxed text-muted-foreground">
-                    {cat.description}
+                    {localized(cat, "description", lang)}
                   </p>
                 )}
 
@@ -218,7 +225,7 @@ export function EventLanding() {
             <div className="mt-10 text-center">
               <Button asChild size="lg" className="rounded-full px-10">
                 <Link to="vote">
-                  <Vote className="size-4" /> Start voting
+                  <Vote className="size-4" /> {t("common.startVoting")}
                 </Link>
               </Button>
             </div>

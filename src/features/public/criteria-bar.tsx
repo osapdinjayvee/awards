@@ -1,3 +1,5 @@
+import { useLang } from "@/hooks/use-lang"
+import { localized } from "@/lib/i18n"
 import type { Criterion } from "@/lib/types"
 
 /**
@@ -12,6 +14,7 @@ function tint(i: number): string {
 }
 
 export function CriteriaBar({ criteria }: { criteria: Criterion[] }) {
+  const { lang } = useLang()
   const total = criteria.reduce((s, c) => s + Number(c.weight), 0) || 100
 
   return (
@@ -32,13 +35,19 @@ export function CriteriaBar({ criteria }: { criteria: Criterion[] }) {
       </div>
       <ul className="space-y-1.5">
         {criteria.map((c, i) => (
-          <li key={c.id} className="flex items-baseline gap-2 text-sm">
+          <li
+            key={c.id}
+            title={localized(c, "description", lang) ?? undefined}
+            className="flex items-baseline gap-2 text-sm"
+          >
             <span
               aria-hidden="true"
               className="size-2 shrink-0 translate-y-px rounded-full"
               style={{ backgroundColor: tint(i) }}
             />
-            <span className="min-w-0 flex-1">{c.name}</span>
+            <span className="min-w-0 flex-1">
+              {localized(c, "name", lang)}
+            </span>
             <span className="shrink-0 font-medium tabular-nums text-muted-foreground">
               {Number(c.weight)}%
             </span>

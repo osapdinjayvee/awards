@@ -1,3 +1,5 @@
+import type { Translatable } from "./i18n"
+
 export type EventStatus = "draft" | "open" | "closed" | "archived"
 export type CategoryType = "individual" | "team"
 export type EmploymentGroup =
@@ -15,7 +17,7 @@ export const ALL_EMPLOYMENT_GROUPS = Object.keys(
   EMPLOYMENT_GROUP_LABELS,
 ) as EmploymentGroup[]
 
-export interface AwardEvent {
+export interface AwardEvent extends Translatable {
   id: string
   slug: string
   title: string
@@ -32,7 +34,7 @@ export interface AwardEvent {
   updated_at: string
 }
 
-export interface AwardCategory {
+export interface AwardCategory extends Translatable {
   id: string
   event_id: string
   name: string
@@ -42,7 +44,7 @@ export interface AwardCategory {
   sort_order: number
 }
 
-export interface Criterion {
+export interface Criterion extends Translatable {
   id: string
   category_id: string
   name: string
