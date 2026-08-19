@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
 import type { EmploymentGroup, VoteCount, VotedEntry } from "@/lib/types"
 
@@ -76,12 +81,31 @@ export function useVoteCounts(categoryId: string, enabled: boolean) {
     queryKey: ["vote-counts", categoryId],
     enabled,
     refetchInterval: 20_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("vote_counts", {
-        p_category_id: categoryId,
-      })
-      if (error) throw new Error(error.message)
-      return (data ?? []) as VoteCount[]
-    },
+    queryFn: () => fetchVoteCounts(categoryId),
+  })
+}
+
+async function fetchVoteCounts(categoryId: string): Promise<VoteCount[]> {
+  const { data, error } = await supabase.rpc("vote_counts", {
+    p_category_id: categoryId,
+  })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as VoteCount[]
+}
+
+/** Live counts for several categories at once, keyed by category id. */
+export function useVoteCountsMany(categoryIds: string[]) {
+  return useQueries({
+    queries: categoryIds.map((id) => ({
+      queryKey: ["vote-counts", id],
+      refetchInterval: 20_000,
+      queryFn: () => fetchVoteCounts(id),
+    })),
+    combine: (results) => ({
+      byCategory: new Map(
+        categoryIds.map((id, i) => [id, results[i]?.data] as const),
+      ),
+      isLoading: results.some((r) => r.isLoading),
+    }),
   })
 }

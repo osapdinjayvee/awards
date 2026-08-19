@@ -65,3 +65,11 @@ export function brandingUrl(path: string | null): string | null {
 export function eventTheme(e: AwardEvent) {
   return { primary: e.primary_color, accent: e.accent_color }
 }
+
+/** Bundled fallback mark (the MinSU seal in /public) for events with no upload. */
+export const DEFAULT_LOGO = "/logo.png"
+
+/** The event's uploaded logo, or the bundled seal. */
+export function eventLogo(e: AwardEvent): string {
+  return brandingUrl(e.logo_path) ?? DEFAULT_LOGO
+}

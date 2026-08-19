@@ -1,7 +1,27 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useOutletContext } from "react-router"
 import { toast } from "sonner"
-import { ArrowLeft, CheckCircle2, PartyPopper } from "lucide-react"
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  Loader2,
+  PartyPopper,
+  Sparkles,
+  UserRoundCog,
+  Vote,
+} from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -20,15 +40,17 @@ import {
   loadVoterIdentity,
   saveVoterIdentity,
 } from "@/lib/voter"
+import { eventLogo } from "@/lib/theme"
 import { useRoster, useUnits } from "@/hooks/use-event"
 import {
   useCastVote,
   useVerifyVoter,
-  useVoteCounts,
+  useVoteCountsMany,
   votingErrorMessage,
 } from "@/hooks/use-voting"
+import { CriteriaBar } from "./criteria-bar"
 import { VoterGate } from "./voter-gate"
-import { SectionPoll, type Candidate } from "./section-poll"
+import { BallotSection, type Candidate } from "./ballot-section"
 
 type Ctx = { event: AwardEvent; categories: CategoryWithCriteria[] }
 
@@ -40,10 +62,18 @@ type BallotStep = {
 const stepKey = (categoryId: string, section: EmploymentGroup | null) =>
   `${categoryId}:${section ?? "_team"}`
 
-function sectionLabel(step: BallotStep): string {
-  return step.section
-    ? EMPLOYMENT_GROUP_LABELS[step.section]
-    : "Units & Offices"
+const sectionLabel = (section: EmploymentGroup | null) =>
+  section ? EMPLOYMENT_GROUP_LABELS[section] : "Units & Offices"
+
+/** Brand-tinted page wash behind the ballot. */
+function PageWash() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
+      <div className="absolute inset-0 bg-linear-to-b from-primary/8 via-background to-background" />
+      <div className="absolute -top-32 -right-24 size-96 rounded-full bg-chart-2/15 blur-3xl" />
+      <div className="absolute top-1/3 -left-32 size-80 rounded-full bg-primary/10 blur-3xl" />
+    </div>
+  )
 }
 
 export function VotingPage() {
@@ -63,21 +93,46 @@ export function VotingPage() {
     loadVoterIdentity(event.id),
   )
   const [votedMap, setVotedMap] = useState<Map<string, VotedEntry> | null>(null)
-  const [index, setIndex] = useState<number | null>(null) // null until resume point known
+  /** stepKey -> candidate id the voter has selected but not yet submitted */
+  const [picks, setPicks] = useState<Map<string, string>>(new Map())
+  const [submitting, setSubmitting] = useState(false)
 
   const verify = useVerifyVoter(event.id)
   const castVote = useCastVote(event.id)
   const { data: people = [] } = useRoster(event.id)
   const { data: units = [] } = useUnits(event.id)
 
+  // Live tallies only for categories the voter has already weighed in on.
+  const votedCategoryIds = useMemo(() => {
+    if (!votedMap) return []
+    return [...new Set([...votedMap.values()].map((v) => v.category_id))].sort()
+  }, [votedMap])
+  const counts = useVoteCountsMany(votedCategoryIds)
+
+  const candidatesFor = useMemo(() => {
+    const byGroup = new Map<EmploymentGroup | null, Candidate[]>()
+    byGroup.set(
+      null,
+      units.map((u) => ({ id: u.id, label: u.name, sub: null })),
+    )
+    for (const person of people) {
+      const list = byGroup.get(person.classification) ?? []
+      list.push({
+        id: person.id,
+        label: person.full_name,
+        sub: person.position,
+      })
+      byGroup.set(person.classification, list)
+    }
+    return byGroup
+  }, [people, units])
+
   // Re-verify a stored identity on mount: refresh the voted list (server truth)
   useEffect(() => {
     if (!identity || votedMap) return
     verify
       .mutateAsync({ idNumber: identity.idNumber, name: identity.enteredName })
-      .then((result) => {
-        applyVotedList(result.voted)
-      })
+      .then((result) => applyVotedList(result.voted))
       .catch(() => {
         clearVoterIdentity(event.id)
         setIdentity(null)
@@ -85,45 +140,30 @@ export function VotingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity])
 
+  /** Sign this voter out and go back to the ID gate. */
+  function switchVoter() {
+    clearVoterIdentity(event.id)
+    setIdentity(null)
+    setVotedMap(null)
+    setPicks(new Map())
+  }
+
   function applyVotedList(voted: VotedEntry[]) {
     const map = new Map(voted.map((v) => [stepKey(v.category_id, v.section), v]))
     setVotedMap(map)
-    setIndex((prev) => {
-      if (prev !== null) return prev
-      const firstOpen = steps.findIndex(
-        (s) => !map.has(stepKey(s.category.id, s.section)),
-      )
-      return firstOpen === -1 ? steps.length : firstOpen
+    setPicks((prev) => {
+      const next = new Map(prev)
+      for (const key of map.keys()) next.delete(key)
+      return next
     })
   }
 
-  const step = index !== null && index < steps.length ? steps[index] : null
-  const currentVoted = step
-    ? (votedMap?.get(stepKey(step.category.id, step.section)) ?? null)
-    : null
-
-  const counts = useVoteCounts(step?.category.id ?? "", !!step && !!currentVoted)
-
-  const candidates = useMemo<Candidate[]>(() => {
-    if (!step) return []
-    if (step.section === null) {
-      return units.map((u) => ({ id: u.id, label: u.name, sub: null }))
-    }
-    return people
-      .filter((p) => p.classification === step.section)
-      .map((p) => ({ id: p.id, label: p.full_name, sub: p.position }))
-  }, [step, people, units])
-
-  const sectionCounts = useMemo(() => {
-    if (!step || !counts.data) return undefined
-    return counts.data.filter((c) => (c.section ?? null) === step.section)
-  }, [counts.data, step])
-
   if (!open) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-md flex-col items-center justify-center gap-3 p-8 text-center">
+      <div className="relative flex min-h-svh flex-col items-center justify-center gap-3 p-8 text-center">
+        <PageWash />
         <p className="text-muted-foreground">Voting for this event is closed.</p>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="rounded-full">
           <Link to={`/e/${event.slug}`}>Back to {event.title}</Link>
         </Button>
       </div>
@@ -150,177 +190,351 @@ export function VotingPage() {
     )
   }
 
-  if (votedMap === null || index === null) {
+  if (votedMap === null) {
     return (
-      <div className="mx-auto max-w-md space-y-4 p-8">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    )
-  }
-
-  // ---------- Finish screen ----------
-  if (!step) {
-    const skipped = steps.filter(
-      (s) => !votedMap.has(stepKey(s.category.id, s.section)),
-    )
-    return (
-      <div className="mx-auto flex min-h-svh max-w-md flex-col items-center justify-center gap-5 px-6 py-16 text-center">
-        <span className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-          <PartyPopper className="size-7" />
-        </span>
-        <div className="space-y-2">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            {skipped.length === 0 ? "Ballot complete" : "Almost done"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            You voted in {steps.length - skipped.length} of {steps.length}{" "}
-            sections
-            {skipped.length === 0
-              ? ". Thank you for taking part!"
-              : ` — ${skipped.length} still open.`}
-          </p>
+      <div className="relative min-h-svh">
+        <PageWash />
+        <div className="mx-auto max-w-3xl space-y-4 p-8">
+          <Skeleton className="h-12 w-full rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-3xl" />
+          <Skeleton className="h-64 w-full rounded-3xl" />
         </div>
-        {skipped.length > 0 && (
-          <div className="w-full space-y-2">
-            {skipped.map((s) => (
-              <button
-                key={stepKey(s.category.id, s.section)}
-                type="button"
-                onClick={() =>
-                  setIndex(
-                    steps.findIndex(
-                      (x) =>
-                        x.category.id === s.category.id &&
-                        x.section === s.section,
-                    ),
-                  )
-                }
-                className="flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors hover:border-primary/40"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">
-                    {s.category.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {sectionLabel(s)}
-                  </span>
-                </span>
-                <span className="shrink-0 text-xs text-primary">Vote now</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <Button asChild variant="outline" className="rounded-full">
-          <Link to={`/e/${event.slug}`}>Back to the awards</Link>
-        </Button>
       </div>
     )
   }
 
-  // ---------- Ballot step ----------
-  const stepNumber = index + 1
   const votedCount = votedMap.size
+  const pendingKeys = [...picks.keys()].filter((k) => !votedMap.has(k))
+  const remaining = steps.length - votedCount - pendingKeys.length
+  const allDone = votedCount === steps.length
 
-  async function handleCast(candidateId: string) {
-    if (!step || !identity) return
-    try {
-      await castVote.mutateAsync({
-        categoryId: step.category.id,
+  async function handleSubmit() {
+    if (!identity || !votedMap || pendingKeys.length === 0) return
+    const byKey = new Map(
+      steps.map((s) => [stepKey(s.category.id, s.section), s]),
+    )
+    setSubmitting(true)
+    const cast: VotedEntry[] = []
+    const failures: string[] = []
+
+    for (const key of pendingKeys) {
+      const step = byKey.get(key)
+      const candidateId = picks.get(key)
+      if (!step || !candidateId) continue
+      const entry: VotedEntry = {
+        category_id: step.category.id,
         section: step.section,
-        idNumber: identity.idNumber,
-        name: identity.enteredName,
-        nomineePersonId: step.section ? candidateId : null,
-        nomineeUnitId: step.section ? null : candidateId,
-      })
-      setVotedMap((prev) => {
-        const next = new Map(prev)
-        next.set(stepKey(step.category.id, step.section), {
-          category_id: step.category.id,
+        nominee_person_id: step.section ? candidateId : null,
+        nominee_unit_id: step.section ? null : candidateId,
+      }
+      try {
+        await castVote.mutateAsync({
+          categoryId: step.category.id,
           section: step.section,
-          nominee_person_id: step.section ? candidateId : null,
-          nominee_unit_id: step.section ? null : candidateId,
+          idNumber: identity.idNumber,
+          name: identity.enteredName,
+          nomineePersonId: entry.nominee_person_id,
+          nomineeUnitId: entry.nominee_unit_id,
         })
-        return next
-      })
-    } catch (err) {
-      const msg = votingErrorMessage(err)
-      toast.error(msg)
-      if (msg.includes("already voted")) {
-        // reconcile with server truth
-        verify
-          .mutateAsync({ idNumber: identity.idNumber, name: identity.enteredName })
-          .then((r) => applyVotedList(r.voted))
-          .catch(() => undefined)
+        cast.push(entry)
+      } catch (err) {
+        failures.push(
+          `${step.category.name} — ${sectionLabel(step.section)}: ${votingErrorMessage(err)}`,
+        )
       }
     }
+
+    if (cast.length > 0) {
+      setVotedMap((prev) => {
+        const next = new Map(prev)
+        for (const entry of cast) {
+          next.set(stepKey(entry.category_id, entry.section), entry)
+        }
+        return next
+      })
+      setPicks((prev) => {
+        const next = new Map(prev)
+        for (const entry of cast) {
+          next.delete(stepKey(entry.category_id, entry.section))
+        }
+        return next
+      })
+      toast.success(
+        `${cast.length} vote${cast.length === 1 ? "" : "s"} submitted. Thank you!`,
+      )
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+
+    if (failures.length > 0) {
+      toast.error(failures[0], {
+        description:
+          failures.length > 1
+            ? `${failures.length - 1} more failed.`
+            : undefined,
+      })
+      // Reconcile with server truth — some sections may already be locked in.
+      verify
+        .mutateAsync({ idNumber: identity.idNumber, name: identity.enteredName })
+        .then((r) => applyVotedList(r.voted))
+        .catch(() => undefined)
+    }
+
+    setSubmitting(false)
   }
 
   return (
-    <div className="mx-auto flex h-svh max-w-2xl flex-col">
+    <div className="relative min-h-svh">
+      <PageWash />
+
       {/* Sticky ballot header */}
-      <header className="border-b bg-background px-6 pb-4 pt-5">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-3 text-muted-foreground"
-            onClick={() => navigate(`/e/${event.slug}`)}
-          >
-            <ArrowLeft className="size-4" /> Exit
-          </Button>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            Step {stepNumber} of {steps.length} · {votedCount} voted
-          </span>
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
+        <div className="mx-auto max-w-3xl px-4 py-3 sm:px-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-ml-2 h-8 rounded-full px-3 text-muted-foreground"
+              onClick={() => navigate(`/e/${event.slug}`)}
+            >
+              <ArrowLeft className="size-4" /> Exit
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  type="button"
+                  className="flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1 text-xs transition-colors hover:border-primary/40 hover:bg-card"
+                >
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                    {identity.fullName.slice(0, 1)}
+                  </span>
+                  <span className="truncate text-muted-foreground">
+                    {identity.fullName}
+                  </span>
+                  <UserRoundCog className="size-3.5 shrink-0 text-muted-foreground" />
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-3xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-heading">
+                    Switch voter?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You are signed in as {identity.fullName}. Votes you already
+                    submitted stay recorded
+                    {pendingKeys.length > 0
+                      ? `, but ${pendingKeys.length} unsent selection${pendingKeys.length === 1 ? "" : "s"} will be discarded`
+                      : ""}
+                    .
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="rounded-full">
+                    Stay signed in
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="rounded-full"
+                    onClick={switchVoter}
+                  >
+                    Switch voter
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+
+          {/* One segment per section: submitted, selected, or untouched */}
+          <div className="flex gap-1" aria-hidden="true">
+            {steps.map((s) => {
+              const key = stepKey(s.category.id, s.section)
+              const done = votedMap.has(key)
+              const picked = picks.has(key)
+              return (
+                <span
+                  key={key}
+                  className={cn(
+                    "h-1 flex-1 rounded-full transition-all duration-300",
+                    done
+                      ? "bg-primary"
+                      : picked
+                        ? "bg-primary/45"
+                        : "bg-muted-foreground/15",
+                  )}
+                />
+              )
+            })}
+          </div>
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span className="font-medium tabular-nums text-foreground">
+              {votedCount}/{steps.length}
+            </span>
+            submitted
+            {pendingKeys.length > 0 && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium tabular-nums text-primary">
+                {pendingKeys.length} ready to send
+              </span>
+            )}
+            {remaining > 0 && <span>· {remaining} left</span>}
+          </p>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-4 pb-40 sm:px-6">
+        <div className="pb-7 pt-10">
+          <img
+            src={eventLogo(event)}
+            alt=""
+            className="mb-4 size-14 rounded-full bg-white object-contain p-1 shadow-sm ring-1 ring-border/60"
+          />
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            <Sparkles className="size-3.5" /> {event.title}
+          </p>
+          <h1 className="mt-3 text-balance font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+            {allDone ? "Your ballot is complete" : "Your ballot"}
+          </h1>
+          <p className="mt-3 max-w-prose text-pretty text-sm/relaxed text-muted-foreground">
+            {allDone
+              ? "Every section is in. The live results below keep updating as others vote."
+              : "Pick one nominee per section, then send them all at once. A submitted section is final."}
+          </p>
         </div>
 
-        {/* Segmented progress: one segment per step */}
-        <div className="mb-4 flex gap-1" aria-hidden="true">
-          {steps.map((s, i) => {
-            const done = votedMap.has(stepKey(s.category.id, s.section))
+        <div className="space-y-5">
+          {categories.map((category, ci) => {
+            const sections = sectionsForCategory(category)
+            const categoryDone = sections.every((s) =>
+              votedMap.has(stepKey(category.id, s)),
+            )
             return (
-              <div
-                key={stepKey(s.category.id, s.section)}
+              <article
+                key={category.id}
                 className={cn(
-                  "h-1.5 flex-1 rounded-full transition-colors",
-                  done
-                    ? "bg-primary"
-                    : i === index
-                      ? "bg-primary/40"
-                      : "bg-muted",
+                  "overflow-hidden rounded-3xl border border-border/60 bg-card/70 shadow-xs backdrop-blur-sm transition-shadow duration-200 hover:shadow-md",
+                  categoryDone && "border-primary/25",
                 )}
-              />
+              >
+                <header className="relative border-b border-border/60 bg-linear-to-br from-primary/8 via-card/0 to-card/0 px-5 py-5 sm:px-6">
+                  <div className="flex items-start gap-3.5">
+                    <span
+                      className={cn(
+                        "flex size-9 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold tabular-nums shadow-xs",
+                        categoryDone
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-primary/10 text-primary",
+                      )}
+                    >
+                      {categoryDone ? (
+                        <CheckCircle2 className="size-4.5" />
+                      ) : (
+                        ci + 1
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-balance font-heading text-lg font-semibold tracking-tight sm:text-xl">
+                        {category.name}
+                      </h2>
+                      {category.description && (
+                        <p className="mt-1.5 text-pretty text-sm/relaxed text-muted-foreground">
+                          {category.description}
+                        </p>
+                      )}
+                      {category.criteria.length > 0 && (
+                        <details className="group mt-3">
+                          <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-full border border-border/60 bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                            How this is judged
+                            <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+                          </summary>
+                          <div className="pt-4">
+                            <CriteriaBar criteria={category.criteria} />
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                </header>
+
+                <div className="divide-y divide-border/60">
+                  {sections.map((section) => {
+                    const key = stepKey(category.id, section)
+                    const voted = votedMap.get(key) ?? null
+                    const categoryCounts = counts.byCategory.get(category.id)
+                    return (
+                      <BallotSection
+                        key={key}
+                        title={sectionLabel(section)}
+                        candidates={candidatesFor.get(section) ?? []}
+                        votedNomineeId={
+                          voted
+                            ? (voted.nominee_person_id ?? voted.nominee_unit_id)
+                            : null
+                        }
+                        pickedId={picks.get(key) ?? null}
+                        onPick={(candidateId) =>
+                          setPicks((prev) => {
+                            const next = new Map(prev)
+                            if (candidateId) next.set(key, candidateId)
+                            else next.delete(key)
+                            return next
+                          })
+                        }
+                        counts={categoryCounts?.filter(
+                          (c) => (c.section ?? null) === section,
+                        )}
+                        countsLoading={counts.isLoading && !categoryCounts}
+                        disabled={submitting}
+                      />
+                    )
+                  })}
+                </div>
+              </article>
             )
           })}
         </div>
 
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          {step.category.name}
-        </p>
-        <h1 className="mt-0.5 flex items-center gap-2 font-heading text-xl font-semibold tracking-tight">
-          {sectionLabel(step)}
-          {currentVoted && (
-            <CheckCircle2 className="size-4 text-primary" aria-label="Voted" />
-          )}
-        </h1>
-      </header>
+        {allDone && (
+          <div className="mt-8 overflow-hidden rounded-3xl border border-primary/20 bg-linear-to-br from-primary/12 via-card/60 to-chart-2/10 px-6 py-10 text-center">
+            <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+              <PartyPopper className="size-6" />
+            </span>
+            <h2 className="mt-4 font-heading text-xl font-semibold tracking-tight">
+              Thank you for voting
+            </h2>
+            <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+              Your ballot for {event.title} is complete.
+            </p>
+            <Button asChild variant="outline" className="mt-5 rounded-full">
+              <Link to={`/e/${event.slug}`}>Back to the awards</Link>
+            </Button>
+          </div>
+        )}
+      </main>
 
-      <SectionPoll
-        key={stepKey(step.category.id, step.section)}
-        candidates={candidates}
-        votedNomineeId={
-          currentVoted
-            ? (currentVoted.nominee_person_id ?? currentVoted.nominee_unit_id)
-            : null
-        }
-        counts={sectionCounts}
-        countsLoading={counts.isLoading}
-        casting={castVote.isPending}
-        onCast={handleCast}
-        onNext={() => setIndex(index + 1)}
-        onSkip={() => setIndex(index + 1)}
-        isLast={index === steps.length - 1}
-      />
+      {/* Floating submit dock */}
+      {!allDone && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-5">
+          <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-full border border-border/60 bg-background/70 p-2 pl-5 shadow-lg backdrop-blur-xl">
+            <p className="min-w-0 flex-1 text-xs/snug text-muted-foreground">
+              {pendingKeys.length === 0
+                ? remaining > 0
+                  ? `Choose a nominee in any of the ${remaining} open section${remaining === 1 ? "" : "s"}.`
+                  : "Nothing left to submit."
+                : `${pendingKeys.length} section${pendingKeys.length === 1 ? "" : "s"} ready to send`}
+            </p>
+            <Button
+              size="lg"
+              className="shrink-0 rounded-full shadow-sm"
+              disabled={pendingKeys.length === 0 || submitting}
+              onClick={handleSubmit}
+            >
+              {submitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Vote className="size-4" />
+              )}
+              Submit{pendingKeys.length > 0 ? ` ${pendingKeys.length}` : ""}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

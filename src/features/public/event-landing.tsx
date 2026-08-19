@@ -1,7 +1,7 @@
 import { Link, useOutletContext } from "react-router"
 import { ArrowDown, CalendarDays, Users, User, Vote } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { brandingUrl } from "@/lib/theme"
+import { brandingUrl, eventLogo } from "@/lib/theme"
 import {
   EMPLOYMENT_GROUP_LABELS,
   eventIsOpen,
@@ -54,7 +54,7 @@ function MedalSeal({ className }: { className?: string }) {
 export function EventLanding() {
   const { event, categories } = useOutletContext<Ctx>()
   const open = eventIsOpen(event)
-  const logo = brandingUrl(event.logo_path)
+  const logo = eventLogo(event)
   const banner = brandingUrl(event.banner_path)
   const remaining = daysLeft(event.closes_at)
 
@@ -73,13 +73,11 @@ export function EventLanding() {
         <MedalSeal className="pointer-events-none absolute -bottom-40 -left-32 size-[22rem] text-white/10" />
 
         <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-5 px-6 pb-20 pt-16 text-center sm:pb-24 sm:pt-20">
-          {logo && (
-            <img
-              src={logo}
-              alt=""
-              className="rise-in size-20 rounded-full bg-white/95 object-contain p-1.5 shadow-lg"
-            />
-          )}
+          <img
+            src={logo}
+            alt=""
+            className="rise-in size-24 rounded-full bg-white/95 object-contain p-2 shadow-xl ring-1 ring-white/40"
+          />
 
           <div className="rise-in flex flex-wrap items-center justify-center gap-2 text-xs font-medium tracking-wide">
             <span

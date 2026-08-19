@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { CircleAlert, IdCard, Loader2 } from "lucide-react"
+import { Link } from "react-router"
+import { CircleAlert, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { eventLogo } from "@/lib/theme"
 import { looksLikeFullName } from "@/lib/voter"
 import { useVerifyVoter, votingErrorMessage, type VerifyResult } from "@/hooks/use-voting"
 import type { AwardEvent } from "@/lib/types"
@@ -48,30 +50,33 @@ export function VoterGate({
   return (
     <Dialog open>
       <DialogContent
-        className="sm:max-w-md [&>button]:hidden"
+        className="overflow-hidden rounded-3xl p-0 sm:max-w-md [&>button]:hidden"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogHeader>
-          <div className="mb-1 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <IdCard className="size-5" />
-          </div>
-          <DialogTitle className="font-heading text-xl">
+        <DialogHeader className="gap-3 border-b border-border/60 bg-linear-to-br from-primary/10 via-card/0 to-chart-2/8 px-6 pb-6 pt-7">
+          <img
+            src={eventLogo(event)}
+            alt=""
+            className="size-14 rounded-full bg-white object-contain p-1 shadow-sm ring-1 ring-border/60"
+          />
+          <DialogTitle className="font-heading text-2xl tracking-tight">
             Verify to vote
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-pretty text-sm/relaxed">
             Voting for {event.title} is open to listed personnel only. Enter
             your employee ID number and full name as they appear on record.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="grid gap-4">
+        <form onSubmit={onSubmit} className="grid gap-4 px-6 pb-7">
           <div className="grid gap-2">
             <Label htmlFor="voter-id">ID number</Label>
             <Input
               id="voter-id"
+              className="h-11 rounded-xl"
               value={idNumber}
               onChange={(e) => setIdNumber(e.target.value)}
-              placeholder="e.g. EMP-0001"
+              placeholder="e.g. MMC-115"
               autoComplete="off"
               required
             />
@@ -80,6 +85,7 @@ export function VoterGate({
             <Label htmlFor="voter-name">Full name</Label>
             <Input
               id="voter-name"
+              className="h-11 rounded-xl"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Jayvee Osapdin"
@@ -94,16 +100,27 @@ export function VoterGate({
           {error && (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+              className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
             >
               <CircleAlert className="mt-0.5 size-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
-          <Button type="submit" disabled={verify.isPending} className="w-full">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={verify.isPending}
+            className="mt-1 w-full rounded-full"
+          >
             {verify.isPending && <Loader2 className="size-4 animate-spin" />}
             Start voting
           </Button>
+          <Link
+            to={`/e/${event.slug}`}
+            className="text-center text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            Back to the awards
+          </Link>
         </form>
       </DialogContent>
     </Dialog>
