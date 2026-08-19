@@ -88,3 +88,28 @@ export function useSetEventStatus(id: string) {
     setStatus: (status: EventStatus) => update.mutateAsync({ status }),
   }
 }
+
+/**
+ * Permanently deletes an event. Categories, criteria, roster, units, voters,
+ * votes, nominations and attachments all cascade; branding files live outside
+ * the database, so remove them from storage first (best effort).
+ */
+export function useDeleteEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data: files } = await supabase.storage.from("branding").list(id)
+      if (files?.length) {
+        await supabase.storage
+          .from("branding")
+          .remove(files.map((f) => `${id}/${f.name}`))
+      }
+      const { error } = await supabase.from("events").delete().eq("id", id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin"] })
+      qc.invalidateQueries({ queryKey: ["events"] })
+    },
+  })
+}

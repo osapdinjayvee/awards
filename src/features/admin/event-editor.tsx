@@ -1,5 +1,5 @@
-import { Link, useParams } from "react-router"
-import { ArrowLeft, ExternalLink } from "lucide-react"
+import { Link, useNavigate, useParams } from "react-router"
+import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -12,9 +12,11 @@ import { BrandingEditor } from "./branding-editor"
 import { NominationsViewer } from "./nominations-viewer"
 import { VotersManager } from "./voters-manager"
 import { ResultsViewer } from "./results-viewer"
+import { DeleteEventDialog } from "./delete-event-dialog"
 
 export function EventEditor() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { data: event, isLoading } = useAdminEvent(id)
 
   if (isLoading || !event) {
@@ -37,13 +39,28 @@ export function EventEditor() {
         </Button>
         <h1 className="text-xl font-semibold">{event.title}</h1>
         <Badge variant="outline">{event.status}</Badge>
-        {(event.status === "open" || event.status === "closed") && (
-          <Button asChild variant="ghost" size="sm" className="ml-auto">
-            <a href={`/e/${event.slug}`} target="_blank" rel="noreferrer">
-              <ExternalLink className="size-4" /> Public page
-            </a>
-          </Button>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {(event.status === "open" || event.status === "closed") && (
+            <Button asChild variant="ghost" size="sm">
+              <a href={`/e/${event.slug}`} target="_blank" rel="noreferrer">
+                <ExternalLink className="size-4" /> Public page
+              </a>
+            </Button>
+          )}
+          <DeleteEventDialog
+            event={event}
+            onDeleted={() => navigate("/admin", { replace: true })}
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-4" /> Delete
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       <Tabs defaultValue="details">

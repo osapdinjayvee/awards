@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
-import { ExternalLink, Loader2, Plus } from "lucide-react"
+import { ExternalLink, Loader2, Plus, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table"
 import { slugify, useAdminEvents, useCreateEvent } from "@/hooks/use-admin"
 import type { EventStatus } from "@/lib/types"
+import { DeleteEventDialog } from "./delete-event-dialog"
 
 const STATUS_VARIANT: Record<EventStatus, "default" | "secondary" | "outline" | "destructive"> = {
   draft: "outline",
@@ -163,14 +164,29 @@ export function Dashboard() {
                   <TableCell className="text-right tabular-nums">
                     {e.nominations?.[0]?.count ?? 0}
                   </TableCell>
-                  <TableCell className="w-10">
-                    {(e.status === "open" || e.status === "closed") && (
-                      <Button asChild variant="ghost" size="icon-sm" aria-label="Open public page">
-                        <a href={`/e/${e.slug}`} target="_blank" rel="noreferrer">
-                          <ExternalLink className="size-4" />
-                        </a>
-                      </Button>
-                    )}
+                  <TableCell className="w-20">
+                    <div className="flex items-center justify-end gap-1">
+                      {(e.status === "open" || e.status === "closed") && (
+                        <Button asChild variant="ghost" size="icon-sm" aria-label="Open public page">
+                          <a href={`/e/${e.slug}`} target="_blank" rel="noreferrer">
+                            <ExternalLink className="size-4" />
+                          </a>
+                        </Button>
+                      )}
+                      <DeleteEventDialog
+                        event={e}
+                        trigger={
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Delete ${e.title}`}
+                            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        }
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
