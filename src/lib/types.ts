@@ -65,6 +65,15 @@ export interface Unit {
   id: string
   event_id: string
   name: string
+  /** Which division the unit sits under; team voting is one pick per division. */
+  division_id: string | null
+}
+
+export interface Division {
+  id: string
+  event_id: string
+  name: string
+  sort_order: number
 }
 
 export interface Nomination {
@@ -110,6 +119,7 @@ export interface Voter {
 export interface VotedEntry {
   category_id: string
   section: EmploymentGroup | null
+  division_id: string | null
   nominee_person_id: string | null
   nominee_unit_id: string | null
 }
@@ -123,6 +133,7 @@ export interface VoterIdentity {
 
 export interface VoteCount {
   section: EmploymentGroup | null
+  division_id: string | null
   nominee_person_id: string | null
   nominee_unit_id: string | null
   votes: number
@@ -135,16 +146,35 @@ export const SECTION_ORDER: EmploymentGroup[] = [
   "permanent_non_teaching",
 ]
 
+/** One contested slot on the ballot: a section, or a division for team awards. */
+export interface BallotSlot {
+  section: EmploymentGroup | null
+  divisionId: string | null
+}
+
 /**
- * The sections a category is contested in.
- * Team categories vote over units (a single null section);
+ * The slots a category is contested in.
+ * Team categories are voted per division — one unit or office chosen in each;
  * individual categories split by eligible employment groups (null/empty = all).
  */
-export function sectionsForCategory(cat: AwardCategory): (EmploymentGroup | null)[] {
-  if (cat.type === "team") return [null]
+export function slotsForCategory(
+  cat: AwardCategory,
+  divisions: Division[],
+): BallotSlot[] {
+  if (cat.type === "team") {
+    return divisions.map((d) => ({ section: null, divisionId: d.id }))
+  }
   const groups =
     cat.eligible_groups && cat.eligible_groups.length > 0
       ? cat.eligible_groups
       : SECTION_ORDER
-  return SECTION_ORDER.filter((g) => groups.includes(g))
+  return SECTION_ORDER.filter((g) => groups.includes(g)).map((section) => ({
+    section,
+    divisionId: null,
+  }))
+}
+
+/** Stable key for a category/slot pair. */
+export function slotKey(categoryId: string, slot: BallotSlot): string {
+  return `${categoryId}:${slot.section ?? slot.divisionId ?? "_team"}`
 }

@@ -54,6 +54,7 @@ export function useCastVote(eventId: string) {
     mutationFn: async (input: {
       categoryId: string
       section: EmploymentGroup | null
+      divisionId: string | null
       idNumber: string
       name: string
       nomineePersonId: string | null
@@ -63,6 +64,7 @@ export function useCastVote(eventId: string) {
         p_event_id: eventId,
         p_category_id: input.categoryId,
         p_section: input.section,
+        p_division_id: input.divisionId,
         p_id_number: input.idNumber,
         p_name: input.name,
         p_nominee_person_id: input.nomineePersonId,

@@ -153,8 +153,9 @@ export function EventLanding() {
               The Awards
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {categories.length} categories · each is voted per employment
-              group · the bar shows how its criteria are weighed
+              {categories.length} categories · individual awards are voted per
+              employment group, the team award per division · the bar shows how
+              its criteria are weighed
             </p>
           </div>
 
@@ -176,7 +177,11 @@ export function EventLanding() {
                       </>
                     )}
                   </span>
-                  {cat.type === "individual" &&
+                  {cat.type === "team" ? (
+                    <span className="text-muted-foreground">
+                      One winner per division
+                    </span>
+                  ) : (
                     cat.eligible_groups &&
                     cat.eligible_groups.length > 0 && (
                       <span className="text-muted-foreground">
@@ -184,7 +189,8 @@ export function EventLanding() {
                           .map((g) => EMPLOYMENT_GROUP_LABELS[g])
                           .join(" · ")}
                       </span>
-                    )}
+                    )
+                  )}
                 </div>
 
                 <h3 className="font-heading text-xl font-semibold tracking-tight">

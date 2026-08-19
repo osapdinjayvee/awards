@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase"
 import type {
   AwardEvent,
   CategoryWithCriteria,
+  Division,
   RosterPerson,
   Unit,
 } from "@/lib/types"
@@ -80,6 +81,23 @@ export function useUnits(eventId: string | undefined) {
         .order("name")
       if (error) throw error
       return data as Unit[]
+    },
+  })
+}
+
+/** Public: divisions for an event (the team award is contested per division). */
+export function useDivisions(eventId: string | undefined) {
+  return useQuery({
+    queryKey: ["divisions", eventId],
+    enabled: !!eventId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("divisions")
+        .select("*")
+        .eq("event_id", eventId!)
+        .order("sort_order")
+      if (error) throw error
+      return data as Division[]
     },
   })
 }

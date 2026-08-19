@@ -13,15 +13,19 @@ import { toCsv, downloadCsv } from "@/lib/csv"
 import { supabase } from "@/lib/supabase"
 import {
   EMPLOYMENT_GROUP_LABELS,
-  sectionsForCategory,
+  slotKey,
+  slotsForCategory,
   type AwardCategory,
   type AwardEvent,
+  type BallotSlot,
+  type Division,
   type EmploymentGroup,
 } from "@/lib/types"
 
 type VoteRow = {
   category_id: string
   section: EmploymentGroup | null
+  division_id: string | null
   nominee_person_id: string | null
   nominee_unit_id: string | null
   roster_people: { full_name: string; position: string | null } | null
@@ -33,16 +37,21 @@ function useResults(eventId: string) {
     queryKey: ["admin", "results", eventId],
     refetchInterval: 30_000,
     queryFn: async () => {
-      const [cats, votes, voters] = await Promise.all([
+      const [cats, divisions, votes, voters] = await Promise.all([
         supabase
           .from("award_categories")
           .select("*")
           .eq("event_id", eventId)
           .order("sort_order"),
         supabase
+          .from("divisions")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("sort_order"),
+        supabase
           .from("votes")
           .select(
-            "category_id, section, nominee_person_id, nominee_unit_id, roster_people(full_name, position), units(name)",
+            "category_id, section, division_id, nominee_person_id, nominee_unit_id, roster_people(full_name, position), units(name)",
           )
           .eq("event_id", eventId),
         supabase
@@ -51,9 +60,11 @@ function useResults(eventId: string) {
           .eq("event_id", eventId),
       ])
       if (cats.error) throw cats.error
+      if (divisions.error) throw divisions.error
       if (votes.error) throw votes.error
       return {
         categories: cats.data as AwardCategory[],
+        divisions: divisions.data as Division[],
         votes: votes.data as unknown as VoteRow[],
         voterCount: voters.count ?? 0,
       }
@@ -86,15 +97,22 @@ export function ResultsViewer({ event }: { event: AwardEvent }) {
 
   const sections = useMemo(() => {
     if (!data) return []
+    const label = (slot: BallotSlot) =>
+      slot.section
+        ? EMPLOYMENT_GROUP_LABELS[slot.section]
+        : (data.divisions.find((d) => d.id === slot.divisionId)?.name ??
+          "Units & Offices")
     return data.categories.flatMap((cat) =>
-      sectionsForCategory(cat).map((section) => ({
+      slotsForCategory(cat, data.divisions).map((slot) => ({
         cat,
-        section,
-        label: section ? EMPLOYMENT_GROUP_LABELS[section] : "Units & Offices",
+        slot,
+        label: label(slot),
         ranked: rank(
           data.votes.filter(
             (v) =>
-              v.category_id === cat.id && (v.section ?? null) === section,
+              v.category_id === cat.id &&
+              (v.section ?? null) === slot.section &&
+              (v.division_id ?? null) === slot.divisionId,
           ),
         ),
       })),
@@ -156,7 +174,7 @@ export function ResultsViewer({ event }: { event: AwardEvent }) {
         const max = s.ranked[0]?.votes || 1
         const sectionTotal = s.ranked.reduce((sum, r) => sum + r.votes, 0)
         return (
-          <Card key={`${s.cat.id}:${s.section ?? "_team"}`}>
+          <Card key={slotKey(s.cat.id, s.slot)}>
             <CardHeader className="pb-3">
               <CardTitle className="flex flex-wrap items-baseline gap-x-2 text-base">
                 {s.cat.name}

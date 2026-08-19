@@ -28,10 +28,12 @@ import { cn } from "@/lib/utils"
 import {
   EMPLOYMENT_GROUP_LABELS,
   eventIsOpen,
-  sectionsForCategory,
+  slotKey,
+  slotsForCategory,
   type AwardEvent,
   type CategoryWithCriteria,
-  type EmploymentGroup,
+  type BallotSlot,
+  type Division,
   type VotedEntry,
   type VoterIdentity,
 } from "@/lib/types"
@@ -41,7 +43,7 @@ import {
   saveVoterIdentity,
 } from "@/lib/voter"
 import { eventLogo } from "@/lib/theme"
-import { useRoster, useUnits } from "@/hooks/use-event"
+import { useDivisions, useRoster, useUnits } from "@/hooks/use-event"
 import {
   useCastVote,
   useVerifyVoter,
@@ -54,16 +56,15 @@ import { BallotSection, type Candidate } from "./ballot-section"
 
 type Ctx = { event: AwardEvent; categories: CategoryWithCriteria[] }
 
-type BallotStep = {
-  category: CategoryWithCriteria
-  section: EmploymentGroup | null
+type BallotStep = { category: CategoryWithCriteria; slot: BallotSlot }
+
+/** Employment group for individual awards, division name for team awards. */
+function slotLabel(slot: BallotSlot, divisions: Division[]): string {
+  if (slot.section) return EMPLOYMENT_GROUP_LABELS[slot.section]
+  return (
+    divisions.find((d) => d.id === slot.divisionId)?.name ?? "Units & Offices"
+  )
 }
-
-const stepKey = (categoryId: string, section: EmploymentGroup | null) =>
-  `${categoryId}:${section ?? "_team"}`
-
-const sectionLabel = (section: EmploymentGroup | null) =>
-  section ? EMPLOYMENT_GROUP_LABELS[section] : "Units & Offices"
 
 /** Brand-tinted page wash behind the ballot. */
 function PageWash() {
@@ -81,12 +82,19 @@ export function VotingPage() {
   const navigate = useNavigate()
   const open = eventIsOpen(event)
 
+  const { data: divisions = [], isLoading: divisionsLoading } = useDivisions(
+    event.id,
+  )
+
   const steps = useMemo<BallotStep[]>(
     () =>
       categories.flatMap((category) =>
-        sectionsForCategory(category).map((section) => ({ category, section })),
+        slotsForCategory(category, divisions).map((slot) => ({
+          category,
+          slot,
+        })),
       ),
-    [categories],
+    [categories, divisions],
   )
 
   const [identity, setIdentity] = useState<VoterIdentity | null>(() =>
@@ -109,23 +117,30 @@ export function VotingPage() {
   }, [votedMap])
   const counts = useVoteCountsMany(votedCategoryIds)
 
+  /** Candidates keyed by slot: employment group, or division id for units. */
   const candidatesFor = useMemo(() => {
-    const byGroup = new Map<EmploymentGroup | null, Candidate[]>()
-    byGroup.set(
-      null,
-      units.map((u) => ({ id: u.id, label: u.name, sub: null })),
-    )
+    const byKey = new Map<string, Candidate[]>()
+    const push = (key: string, c: Candidate) => {
+      const list = byKey.get(key) ?? []
+      list.push(c)
+      byKey.set(key, list)
+    }
+    for (const u of units) {
+      if (!u.division_id) continue
+      push(u.division_id, { id: u.id, label: u.name, sub: null })
+    }
     for (const person of people) {
-      const list = byGroup.get(person.classification) ?? []
-      list.push({
+      push(person.classification, {
         id: person.id,
         label: person.full_name,
         sub: person.position,
       })
-      byGroup.set(person.classification, list)
     }
-    return byGroup
+    return byKey
   }, [people, units])
+
+  const candidatesForSlot = (slot: BallotSlot): Candidate[] =>
+    candidatesFor.get(slot.section ?? slot.divisionId ?? "") ?? []
 
   // Re-verify a stored identity on mount: refresh the voted list (server truth)
   useEffect(() => {
@@ -149,7 +164,15 @@ export function VotingPage() {
   }
 
   function applyVotedList(voted: VotedEntry[]) {
-    const map = new Map(voted.map((v) => [stepKey(v.category_id, v.section), v]))
+    const map = new Map(
+      voted.map((v) => [
+        slotKey(v.category_id, {
+          section: v.section,
+          divisionId: v.division_id,
+        }),
+        v,
+      ]),
+    )
     setVotedMap(map)
     setPicks((prev) => {
       const next = new Map(prev)
@@ -190,7 +213,9 @@ export function VotingPage() {
     )
   }
 
-  if (votedMap === null) {
+  // Divisions decide how many team slots exist, so wait for them before
+  // judging the ballot complete.
+  if (votedMap === null || divisionsLoading) {
     return (
       <div className="relative min-h-svh">
         <PageWash />
@@ -203,7 +228,9 @@ export function VotingPage() {
     )
   }
 
-  const votedCount = votedMap.size
+  const votedCount = steps.filter((s) =>
+    votedMap.has(slotKey(s.category.id, s.slot)),
+  ).length
   const pendingKeys = [...picks.keys()].filter((k) => !votedMap.has(k))
   const remaining = steps.length - votedCount - pendingKeys.length
   const allDone = votedCount === steps.length
@@ -211,7 +238,7 @@ export function VotingPage() {
   async function handleSubmit() {
     if (!identity || !votedMap || pendingKeys.length === 0) return
     const byKey = new Map(
-      steps.map((s) => [stepKey(s.category.id, s.section), s]),
+      steps.map((s) => [slotKey(s.category.id, s.slot), s]),
     )
     setSubmitting(true)
     const cast: VotedEntry[] = []
@@ -221,16 +248,19 @@ export function VotingPage() {
       const step = byKey.get(key)
       const candidateId = picks.get(key)
       if (!step || !candidateId) continue
+      const isTeam = step.slot.section === null
       const entry: VotedEntry = {
         category_id: step.category.id,
-        section: step.section,
-        nominee_person_id: step.section ? candidateId : null,
-        nominee_unit_id: step.section ? null : candidateId,
+        section: step.slot.section,
+        division_id: step.slot.divisionId,
+        nominee_person_id: isTeam ? null : candidateId,
+        nominee_unit_id: isTeam ? candidateId : null,
       }
       try {
         await castVote.mutateAsync({
           categoryId: step.category.id,
-          section: step.section,
+          section: step.slot.section,
+          divisionId: step.slot.divisionId,
           idNumber: identity.idNumber,
           name: identity.enteredName,
           nomineePersonId: entry.nominee_person_id,
@@ -239,7 +269,7 @@ export function VotingPage() {
         cast.push(entry)
       } catch (err) {
         failures.push(
-          `${step.category.name} — ${sectionLabel(step.section)}: ${votingErrorMessage(err)}`,
+          `${step.category.name} — ${slotLabel(step.slot, divisions)}: ${votingErrorMessage(err)}`,
         )
       }
     }
@@ -248,14 +278,25 @@ export function VotingPage() {
       setVotedMap((prev) => {
         const next = new Map(prev)
         for (const entry of cast) {
-          next.set(stepKey(entry.category_id, entry.section), entry)
+          next.set(
+            slotKey(entry.category_id, {
+              section: entry.section,
+              divisionId: entry.division_id,
+            }),
+            entry,
+          )
         }
         return next
       })
       setPicks((prev) => {
         const next = new Map(prev)
         for (const entry of cast) {
-          next.delete(stepKey(entry.category_id, entry.section))
+          next.delete(
+            slotKey(entry.category_id, {
+              section: entry.section,
+              divisionId: entry.division_id,
+            }),
+          )
         }
         return next
       })
@@ -345,7 +386,7 @@ export function VotingPage() {
           {/* One segment per section: submitted, selected, or untouched */}
           <div className="flex gap-1" aria-hidden="true">
             {steps.map((s) => {
-              const key = stepKey(s.category.id, s.section)
+              const key = slotKey(s.category.id, s.slot)
               const done = votedMap.has(key)
               const picked = picks.has(key)
               return (
@@ -400,10 +441,10 @@ export function VotingPage() {
 
         <div className="space-y-5">
           {categories.map((category, ci) => {
-            const sections = sectionsForCategory(category)
-            const categoryDone = sections.every((s) =>
-              votedMap.has(stepKey(category.id, s)),
-            )
+            const slots = slotsForCategory(category, divisions)
+            const categoryDone =
+              slots.length > 0 &&
+              slots.every((s) => votedMap.has(slotKey(category.id, s)))
             return (
               <article
                 key={category.id}
@@ -453,15 +494,21 @@ export function VotingPage() {
                 </header>
 
                 <div className="divide-y divide-border/60">
-                  {sections.map((section) => {
-                    const key = stepKey(category.id, section)
+                  {slots.length === 0 && (
+                    <p className="p-5 text-sm text-muted-foreground sm:p-6">
+                      This award isn't open for voting yet — no divisions have
+                      been set up for it.
+                    </p>
+                  )}
+                  {slots.map((slot) => {
+                    const key = slotKey(category.id, slot)
                     const voted = votedMap.get(key) ?? null
                     const categoryCounts = counts.byCategory.get(category.id)
                     return (
                       <BallotSection
                         key={key}
-                        title={sectionLabel(section)}
-                        candidates={candidatesFor.get(section) ?? []}
+                        title={slotLabel(slot, divisions)}
+                        candidates={candidatesForSlot(slot)}
                         votedNomineeId={
                           voted
                             ? (voted.nominee_person_id ?? voted.nominee_unit_id)
@@ -477,7 +524,9 @@ export function VotingPage() {
                           })
                         }
                         counts={categoryCounts?.filter(
-                          (c) => (c.section ?? null) === section,
+                          (c) =>
+                            (c.section ?? null) === slot.section &&
+                            (c.division_id ?? null) === slot.divisionId,
                         )}
                         countsLoading={counts.isLoading && !categoryCounts}
                         disabled={submitting}

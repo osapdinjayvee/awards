@@ -12,6 +12,13 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -25,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { supabase } from "@/lib/supabase"
 import {
   EMPLOYMENT_GROUP_LABELS,
+  type Division,
   type RosterPerson,
   type Unit,
 } from "@/lib/types"
@@ -41,6 +49,21 @@ function useAdminRoster(eventId: string) {
         .order("full_name")
       if (error) throw error
       return data as RosterPerson[]
+    },
+  })
+}
+
+function useAdminDivisions(eventId: string) {
+  return useQuery({
+    queryKey: ["admin", "divisions", eventId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("divisions")
+        .select("*")
+        .eq("event_id", eventId)
+        .order("sort_order")
+      if (error) throw error
+      return data as Division[]
     },
   })
 }
@@ -64,8 +87,10 @@ export function RosterManager({ eventId }: { eventId: string }) {
   const qc = useQueryClient()
   const { data: people, isLoading } = useAdminRoster(eventId)
   const { data: units } = useAdminUnits(eventId)
+  const { data: divisions } = useAdminDivisions(eventId)
   const [search, setSearch] = useState("")
   const [unitsDraft, setUnitsDraft] = useState("")
+  const [unitDivision, setUnitDivision] = useState("")
 
   const filtered = useMemo(() => {
     if (!people) return []
@@ -92,7 +117,11 @@ export function RosterManager({ eventId }: { eventId: string }) {
 
   const addUnits = useMutation({
     mutationFn: async (names: string[]) => {
-      const rows = names.map((name) => ({ event_id: eventId, name }))
+      const rows = names.map((name) => ({
+        event_id: eventId,
+        name,
+        division_id: unitDivision || null,
+      }))
       const { error } = await supabase
         .from("units")
         .upsert(rows, { onConflict: "event_id,name", ignoreDuplicates: true })
@@ -193,27 +222,48 @@ export function RosterManager({ eventId }: { eventId: string }) {
             Units & offices ({units?.length ?? 0})
           </CardTitle>
           <CardDescription>
-            Nominees for team categories. Add one unit per line.
+            Nominees for the team award — voters pick one unit in each division.
+            Add one unit per line.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {units && units.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {units.map((u) => (
-                <Badge key={u.id} variant="secondary" className="gap-1 pr-1">
-                  {u.name}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${u.name}`}
-                    className="rounded-full p-0.5 hover:bg-destructive/20"
-                    onClick={() => removeUnit.mutate(u.id)}
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
+          {[
+            ...(divisions ?? []).map((d) => ({ id: d.id, name: d.name })),
+            { id: "", name: "No division — not votable" },
+          ].map((group) => {
+            const inGroup = (units ?? []).filter(
+              (u) => (u.division_id ?? "") === group.id,
+            )
+            if (inGroup.length === 0) return null
+            return (
+              <div key={group.id || "_none"} className="space-y-1.5">
+                <p
+                  className={
+                    group.id
+                      ? "text-xs font-medium text-muted-foreground"
+                      : "text-xs font-medium text-destructive"
+                  }
+                >
+                  {group.name} ({inGroup.length})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {inGroup.map((u) => (
+                    <Badge key={u.id} variant="secondary" className="gap-1 pr-1">
+                      {u.name}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${u.name}`}
+                        className="rounded-full p-0.5 hover:bg-destructive/20"
+                        onClick={() => removeUnit.mutate(u.id)}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
           <div className="space-y-2">
             <Textarea
               rows={3}
@@ -221,9 +271,23 @@ export function RosterManager({ eventId }: { eventId: string }) {
               value={unitsDraft}
               onChange={(e) => setUnitsDraft(e.target.value)}
             />
+            <Select value={unitDivision} onValueChange={setUnitDivision}>
+              <SelectTrigger className="w-full sm:w-80">
+                <SelectValue placeholder="Assign to division..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(divisions ?? []).map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               size="sm"
-              disabled={!unitsDraft.trim() || addUnits.isPending}
+              disabled={
+                !unitsDraft.trim() || !unitDivision || addUnits.isPending
+              }
               onClick={() =>
                 addUnits.mutate(
                   [...new Set(
