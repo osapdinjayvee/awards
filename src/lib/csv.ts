@@ -19,3 +19,16 @@ export function downloadCsv(filename: string, csv: string) {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+/**
+ * Reads an uploaded CSV as text, falling back to Windows-1252 when the bytes
+ * are not valid UTF-8. HR exports from Excel are routinely Latin-1, and
+ * decoding those as UTF-8 turns Bolaños into Bola<?>os — which then fails the
+ * name check at the voting gate.
+ */
+export async function readCsvFile(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  const utf8 = new TextDecoder("utf-8").decode(buffer)
+  if (!utf8.includes("\uFFFD")) return utf8
+  return new TextDecoder("windows-1252").decode(buffer)
+}

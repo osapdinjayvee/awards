@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Download, RefreshCw, Search } from "lucide-react"
+import { Download, RefreshCw, Search, TriangleAlert } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -79,7 +79,7 @@ const STATUS_LABEL: Record<Status, string> = {
 
 /** Turnout tracking: who has voted, who still needs a nudge. */
 export function TurnoutViewer({ event }: { event: AwardEvent }) {
-  const { data, isLoading, refetch, isRefetching } = useTurnout(event.id)
+  const { data, isLoading, error, refetch, isRefetching } = useTurnout(event.id)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<Filter>("all")
 
@@ -127,6 +127,41 @@ export function TurnoutViewer({ event }: { event: AwardEvent }) {
           r.last_vote_at ? new Date(r.last_vote_at).toLocaleString() : "",
         ]),
       ),
+    )
+  }
+
+  if (error) {
+    // PGRST202 = the RPC is missing, i.e. the migration has not been applied.
+    const missingFunction =
+      (error as { code?: string }).code === "PGRST202" ||
+      /voter_turnout/.test(error.message)
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm"
+      >
+        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
+        <div className="space-y-1">
+          <p className="font-medium text-destructive">
+            {missingFunction
+              ? "Turnout tracking is not set up yet"
+              : "Could not load turnout"}
+          </p>
+          <p className="text-muted-foreground">
+            {missingFunction ? (
+              <>
+                Run{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  supabase/migrations/010_voter_turnout.sql
+                </code>{" "}
+                in the Supabase SQL editor, then reload this page.
+              </>
+            ) : (
+              error.message
+            )}
+          </p>
+        </div>
+      </div>
     )
   }
 

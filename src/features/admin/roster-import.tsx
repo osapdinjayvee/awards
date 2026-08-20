@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { readCsvFile } from "@/lib/csv"
 import { supabase } from "@/lib/supabase"
 import {
   ALL_EMPLOYMENT_GROUPS,
@@ -108,14 +109,18 @@ export function RosterImport({ eventId }: { eventId: string }) {
     }
   }
 
-  function onFile(file: File | undefined) {
+  async function onFile(file: File | undefined) {
     if (!file) return
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: "greedy",
-      complete: (res) => loadParsed(res.data, res.meta.fields ?? []),
-      error: () => toast.error("Could not parse that file as CSV."),
-    })
+    try {
+      const text = await readCsvFile(file)
+      const res = Papa.parse<Record<string, string>>(text, {
+        header: true,
+        skipEmptyLines: "greedy",
+      })
+      loadParsed(res.data, res.meta.fields ?? [])
+    } catch {
+      toast.error("Could not read that file as CSV.")
+    }
     if (fileRef.current) fileRef.current.value = ""
   }
 

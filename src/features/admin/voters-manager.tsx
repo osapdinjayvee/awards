@@ -32,10 +32,13 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { matchesTokens, normalizeForSearch, searchTokens } from "@/lib/search"
+import { readCsvFile } from "@/lib/csv"
 import { supabase } from "@/lib/supabase"
 import type { Voter } from "@/lib/types"
 
 const NONE = "__none__"
+
+const normId = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9]/g, "")
 
 function guessColumn(headers: string[], patterns: RegExp): string {
   return headers.find((h) => patterns.test(h)) ?? NONE
@@ -78,16 +81,26 @@ export function VotersManager({ eventId }: { eventId: string }) {
     setNameCol(guessColumn(fields, /name/i))
   }
 
-  function onFile(file: File | undefined) {
+  async function onFile(file: File | undefined) {
     if (!file) return
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: "greedy",
-      complete: (res) => loadParsed(res.data, res.meta.fields ?? []),
-      error: () => toast.error("Could not parse that file as CSV."),
-    })
+    try {
+      const text = await readCsvFile(file)
+      const res = Papa.parse<Record<string, string>>(text, {
+        header: true,
+        skipEmptyLines: "greedy",
+      })
+      loadParsed(res.data, res.meta.fields ?? [])
+    } catch {
+      toast.error("Could not read that file as CSV.")
+    }
     if (fileRef.current) fileRef.current.value = ""
   }
+
+  /** Normalized ids already on the voter list — matches the unique index. */
+  const existingIds = useMemo(
+    () => new Set((voters ?? []).map((v) => normId(v.id_number))),
+    [voters],
+  )
 
   const prepared = useMemo(() => {
     if (idCol === NONE || nameCol === NONE) return []
@@ -97,13 +110,21 @@ export function VotersManager({ eventId }: { eventId: string }) {
         const id_number = (r[idCol] ?? "").trim()
         const full_name = (r[nameCol] ?? "").trim()
         if (!id_number || !full_name) return null
-        const norm = id_number.toLowerCase().replace(/[^a-z0-9]/g, "")
+        const norm = normId(id_number)
         if (!norm || seen.has(norm)) return null
         seen.add(norm)
         return { event_id: eventId, id_number, full_name }
       })
       .filter(Boolean) as { event_id: string; id_number: string; full_name: string }[]
   }, [rows, idCol, nameCol, eventId])
+
+  // Re-importing a list that overlaps the current one is normal — the second
+  // pass should add the new people, not fail on the ones already there.
+  const { toInsert, skipped } = useMemo(() => {
+    if (replace) return { toInsert: prepared, skipped: 0 }
+    const fresh = prepared.filter((p) => !existingIds.has(normId(p.id_number)))
+    return { toInsert: fresh, skipped: prepared.length - fresh.length }
+  }, [prepared, existingIds, replace])
 
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -114,27 +135,34 @@ export function VotersManager({ eventId }: { eventId: string }) {
           .eq("event_id", eventId)
         if (error) throw error
       }
-      for (let i = 0; i < prepared.length; i += 500) {
+      for (let i = 0; i < toInsert.length; i += 500) {
         const { error } = await supabase
           .from("voters")
-          .insert(prepared.slice(i, i + 500))
+          .insert(toInsert.slice(i, i + 500))
         if (error) throw error
       }
-      return prepared.length
+      return toInsert.length
     },
     onSuccess: (count) => {
       qc.invalidateQueries({ queryKey: ["admin", "voters", eventId] })
-      toast.success(`Imported ${count} voters.`)
+      toast.success(
+        skipped > 0
+          ? `Imported ${count} voters — ${skipped} skipped, already listed.`
+          : `Imported ${count} voters.`,
+      )
       setRows([])
       setHeaders([])
       setPasteValue("")
     },
     onError: (err) => {
-      const msg =
-        err instanceof Error && err.message.includes("duplicate")
-          ? "Some ID numbers already exist for this event. Use Replace, or remove the duplicates."
-          : "Import failed. Nothing may have been saved — try again."
-      toast.error(msg)
+      // Supabase rejects with a PostgrestError object, not an Error instance.
+      const e = err as { message?: string; code?: string }
+      const duplicate = e.code === "23505" || /duplicate/i.test(e.message ?? "")
+      toast.error(
+        duplicate
+          ? "Some ID numbers already exist for this event. Refresh and try again."
+          : `Import failed — nothing was saved. ${e.message ?? ""}`.trim(),
+      )
     },
   })
 
@@ -263,6 +291,15 @@ export function VotersManager({ eventId }: { eventId: string }) {
                   <p className="text-xs text-muted-foreground">
                     Showing first 8 of {prepared.length} voters to import
                     (duplicate IDs within the paste are dropped).
+                    {skipped > 0 && (
+                      <>
+                        {" "}
+                        <span className="font-medium text-foreground">
+                          {skipped} already on the list
+                        </span>{" "}
+                        will be skipped.
+                      </>
+                    )}
                   </p>
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <label className="flex items-center gap-2 text-sm">
@@ -271,14 +308,14 @@ export function VotersManager({ eventId }: { eventId: string }) {
                     </label>
                     <Button
                       onClick={() => importMutation.mutate()}
-                      disabled={importMutation.isPending}
+                      disabled={importMutation.isPending || toInsert.length === 0}
                     >
                       {importMutation.isPending ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
                         <Upload className="size-4" />
                       )}
-                      Import {prepared.length} voters
+                      Import {toInsert.length} voters
                     </Button>
                   </div>
                 </>
