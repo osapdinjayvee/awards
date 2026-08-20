@@ -13,6 +13,7 @@ import { NominationsViewer } from "./nominations-viewer"
 import { VotersManager } from "./voters-manager"
 import { ResultsViewer } from "./results-viewer"
 import { TranslationsEditor } from "./translations-editor"
+import { TurnoutViewer } from "./turnout-viewer"
 import { DeleteEventDialog } from "./delete-event-dialog"
 
 export function EventEditor() {
@@ -72,6 +73,7 @@ export function EventEditor() {
           <TabsTrigger value="voters">Voters</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="translations">Languages</TabsTrigger>
+          <TabsTrigger value="turnout">Turnout</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
           <TabsTrigger value="nominations">Nominations</TabsTrigger>
         </TabsList>
@@ -92,6 +94,9 @@ export function EventEditor() {
         </TabsContent>
         <TabsContent value="translations" className="pt-4">
           <TranslationsEditor eventId={event.id} />
+        </TabsContent>
+        <TabsContent value="turnout" className="pt-4">
+          <TurnoutViewer event={event} />
         </TabsContent>
         <TabsContent value="results" className="pt-4">
           <ResultsViewer event={event} />

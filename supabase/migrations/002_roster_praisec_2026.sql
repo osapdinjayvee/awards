@@ -3,6 +3,13 @@
 -- Generated from "checklist for awarding.xlsx" (sheet: JUNE 2026, as of June 30, 2026)
 -- Replaces the sample roster seeded by seed.sql.
 -- Apply in: Supabase Dashboard -> SQL Editor
+--
+-- !! ALREADY APPLIED — DO NOT RE-RUN WHILE VOTING IS OPEN !!
+-- The delete below cascades to votes.nominee_person_id, so re-running it
+-- destroys every ballot cast in the individual awards. Check first:
+--   select count(*) from public.votes
+--   where event_id = '11111111-1111-4111-8111-111111111111'
+--     and nominee_person_id is not null;
 -- =============================================================
 
 delete from public.roster_people where event_id = '11111111-1111-4111-8111-111111111111';

@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from "react"
 import Papa from "papaparse"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { FileUp, Loader2, Upload } from "lucide-react"
+import { FileUp, Loader2, TriangleAlert, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -38,6 +38,22 @@ import {
 
 const NONE = "__none__"
 
+/** Votes already cast for people in this roster — replacing it deletes them. */
+function usePersonVoteCount(eventId: string) {
+  return useQuery({
+    queryKey: ["admin", "person-vote-count", eventId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("votes")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", eventId)
+        .not("nominee_person_id", "is", null)
+      if (error) throw error
+      return count ?? 0
+    },
+  })
+}
+
 function guessGroup(value: string): EmploymentGroup | null {
   const v = value.toLowerCase()
   if (/jo|job\s*order|cos|contract/.test(v)) return "job_order_cos"
@@ -62,7 +78,9 @@ export function RosterImport({ eventId }: { eventId: string }) {
   const [classCol, setClassCol] = useState(NONE)
   const [fallbackGroup, setFallbackGroup] = useState<EmploymentGroup>("permanent_teaching")
   const [valueMap, setValueMap] = useState<Record<string, EmploymentGroup>>({})
+  const { data: personVotes = 0 } = usePersonVoteCount(eventId)
   const [replace, setReplace] = useState(true)
+  const votesAtRisk = replace ? personVotes : 0
 
   function loadParsed(data: Record<string, string>[], fields: string[]) {
     const cleaned = data.filter((r) =>
@@ -326,6 +344,20 @@ export function RosterImport({ eventId }: { eventId: string }) {
                 <p className="text-xs text-muted-foreground">
                   Showing first 10 of {prepared.length} people to import.
                 </p>
+                {votesAtRisk > 0 && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+                  >
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                      This event already has {votesAtRisk} vote
+                      {votesAtRisk === 1 ? "" : "s"} for people in the roster.
+                      Replacing it deletes those ballots — switch Replace off to
+                      append instead.
+                    </span>
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <label className="flex items-center gap-2 text-sm">
                     <Switch checked={replace} onCheckedChange={setReplace} />
