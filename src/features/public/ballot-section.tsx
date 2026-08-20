@@ -16,6 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { useLang } from "@/hooks/use-lang"
+import { matchesTokens, normalizeForSearch, searchTokens } from "@/lib/search"
 import { cn } from "@/lib/utils"
 import type { VoteCount } from "@/lib/types"
 
@@ -55,11 +56,28 @@ export function BallotSection({
   const { t } = useLang()
   const [open, setOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [search, setSearch] = useState("")
 
   const byId = useMemo(
     () => new Map(candidates.map((c) => [c.id, c])),
     [candidates],
   )
+
+  // Name and position folded once per candidate, matched on every keystroke.
+  const haystacks = useMemo(
+    () =>
+      new Map(
+        candidates.map((c) => [c.id, normalizeForSearch(`${c.label} ${c.sub ?? ""}`)]),
+      ),
+    [candidates],
+  )
+  const matches = useMemo(() => {
+    const tokens = searchTokens(search)
+    if (tokens.length === 0) return candidates
+    return candidates.filter((c) =>
+      matchesTokens(haystacks.get(c.id) ?? "", tokens),
+    )
+  }, [candidates, haystacks, search])
 
   // ---------- Submitted: live results ----------
   if (votedNomineeId) {
@@ -145,7 +163,13 @@ export function BallotSection({
         </span>
       </div>
 
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next)
+          if (!next) setSearch("")
+        }}
+      >
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -197,15 +221,19 @@ export function BallotSection({
           sideOffset={6}
           className="w-(--radix-popover-trigger-width) overflow-hidden rounded-2xl p-0 shadow-lg"
         >
-          <Command>
-            <CommandInput placeholder={t("section.searchPlaceholder")} />
+          <Command shouldFilter={false}>
+            <CommandInput
+              value={search}
+              onValueChange={setSearch}
+              placeholder={t("section.searchPlaceholder")}
+            />
             <CommandList>
               <CommandEmpty>{t("section.noMatch")}</CommandEmpty>
               <CommandGroup>
-                {candidates.map((c) => (
+                {matches.map((c) => (
                   <CommandItem
                     key={c.id}
-                    value={`${c.label} ${c.sub ?? ""} ${c.id}`}
+                    value={c.id}
                     className="rounded-xl py-2.5"
                     onSelect={() => {
                       onPick(pickedId === c.id ? null : c.id)

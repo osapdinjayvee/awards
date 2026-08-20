@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { matchesTokens, normalizeForSearch, searchTokens } from "@/lib/search"
 import { supabase } from "@/lib/supabase"
 import {
   EMPLOYMENT_GROUP_LABELS,
@@ -94,12 +95,13 @@ export function RosterManager({ eventId }: { eventId: string }) {
 
   const filtered = useMemo(() => {
     if (!people) return []
-    const q = search.trim().toLowerCase()
-    if (!q) return people
-    return people.filter(
-      (p) =>
-        p.full_name.toLowerCase().includes(q) ||
-        (p.position ?? "").toLowerCase().includes(q),
+    const tokens = searchTokens(search)
+    if (tokens.length === 0) return people
+    return people.filter((p) =>
+      matchesTokens(
+        normalizeForSearch(`${p.full_name} ${p.position ?? ""}`),
+        tokens,
+      ),
     )
   }, [people, search])
 

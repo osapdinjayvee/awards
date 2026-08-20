@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { matchesTokens, normalizeForSearch, searchTokens } from "@/lib/search"
 import { supabase } from "@/lib/supabase"
 import type { Voter } from "@/lib/types"
 
@@ -149,12 +150,13 @@ export function VotersManager({ eventId }: { eventId: string }) {
 
   const filtered = useMemo(() => {
     if (!voters) return []
-    const q = search.trim().toLowerCase()
-    if (!q) return voters
-    return voters.filter(
-      (v) =>
-        v.full_name.toLowerCase().includes(q) ||
-        v.id_number.toLowerCase().includes(q),
+    const tokens = searchTokens(search)
+    if (tokens.length === 0) return voters
+    return voters.filter((v) =>
+      matchesTokens(
+        normalizeForSearch(`${v.full_name} ${v.id_number}`),
+        tokens,
+      ),
     )
   }, [voters, search])
 
