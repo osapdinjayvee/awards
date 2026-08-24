@@ -80,7 +80,7 @@ const en = {
   "ballot.intro":
     "Pick one nominee per section, then send them all at once. A submitted section is final.",
   "ballot.introDone":
-    "Every section is in. The live results below keep updating as others vote.",
+    "Every section is in. Results are counted privately and announced by the organizers.",
   "ballot.howJudged": "How this is judged",
   "ballot.noDivisions":
     "This award isn't open for voting yet — no divisions have been set up for it.",
@@ -107,9 +107,9 @@ const en = {
 
   // --- section picker / results
   "section.submitted": "Submitted",
-  "section.votes": ({ n }: Params) => `${n} ${plural(Number(n), "vote", "votes")}`,
-  "section.loadingResults": "Loading results...",
-  "section.showMore": ({ n }: Params) => `Show ${n} more`,
+  "section.lockedVote": "Your vote is locked in",
+  "section.resultsHidden":
+    "Your choice is final. Results stay with the organizers and are not shown to voters.",
   "section.candidates": ({ n }: Params) =>
     `${n} ${plural(Number(n), "candidate", "candidates")}`,
   "section.choose": "Search and choose a nominee",
@@ -182,7 +182,7 @@ const tl: Record<TranslationKey, Entry> = {
   "ballot.intro":
     "Pumili ng isang nominado kada seksyon, pagkatapos ay ipadala lahat nang sabay-sabay. Hindi na mababago ang naipasang seksyon.",
   "ballot.introDone":
-    "Kumpleto na ang lahat ng seksyon. Patuloy na nag-a-update ang resulta sa ibaba habang bumoboto ang iba.",
+    "Kumpleto na ang lahat ng seksyon. Pribadong binibilang ang resulta at ang mga organisador ang maghahayag nito.",
   "ballot.howJudged": "Paano ito hinuhusgahan",
   "ballot.noDivisions":
     "Hindi pa bukas sa pagboto ang parangal na ito — wala pang nakatakdang dibisyon.",
@@ -206,9 +206,9 @@ const tl: Record<TranslationKey, Entry> = {
   "ballot.unitsAndOffices": "Mga Yunit at Tanggapan",
 
   "section.submitted": "Naipasa",
-  "section.votes": ({ n }) => `${n} boto`,
-  "section.loadingResults": "Kinukuha ang resulta...",
-  "section.showMore": ({ n }) => `Ipakita pa ang ${n}`,
+  "section.lockedVote": "Nakatala na ang inyong boto",
+  "section.resultsHidden":
+    "Final na ang inyong napili. Nasa mga organisador ang resulta at hindi ito ipinapakita sa mga botante.",
   "section.candidates": ({ n }) => `${n} kandidato`,
   "section.choose": "Maghanap at pumili ng nominado",
   "section.empty": "Wala pang kandidato sa seksyong ito",
@@ -277,7 +277,7 @@ const taglish: Record<TranslationKey, Entry> = {
   "ballot.intro":
     "Pumili ng isang nominee kada section, tapos i-submit lahat nang sabay. Final na ang na-submit na section.",
   "ballot.introDone":
-    "Complete na lahat ng section. Live pa rin ang results sa baba habang bumoboto ang iba.",
+    "Complete na lahat ng section. Private ang bilang ng results at ang organizers ang mag-a-announce.",
   "ballot.howJudged": "Paano ito ji-judge",
   "ballot.noDivisions":
     "Hindi pa open sa voting ang award na ito — wala pang naka-set na division.",
@@ -301,9 +301,9 @@ const taglish: Record<TranslationKey, Entry> = {
   "ballot.unitsAndOffices": "Units & Offices",
 
   "section.submitted": "Na-submit",
-  "section.votes": ({ n }) => `${n} votes`,
-  "section.loadingResults": "Kinukuha ang results...",
-  "section.showMore": ({ n }) => `Show pa ang ${n}`,
+  "section.lockedVote": "Locked in na ang vote ninyo",
+  "section.resultsHidden":
+    "Final na ang pinili ninyo. Nasa organizers ang results at hindi ito nakikita ng mga voter.",
   "section.candidates": ({ n }) => `${n} candidates`,
   "section.choose": "Mag-search at pumili ng nominee",
   "section.empty": "Wala pang candidate sa section na ito",

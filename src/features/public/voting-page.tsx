@@ -44,12 +44,7 @@ import {
 } from "@/lib/voter"
 import { eventLogo } from "@/lib/theme"
 import { useDivisions, useRoster, useUnits } from "@/hooks/use-event"
-import {
-  useCastVote,
-  useVerifyVoter,
-  useVoteCountsMany,
-  votingErrorKey,
-} from "@/hooks/use-voting"
+import { useCastVote, useVerifyVoter, votingErrorKey } from "@/hooks/use-voting"
 import { useLang } from "@/hooks/use-lang"
 import { localized } from "@/lib/i18n"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -115,13 +110,6 @@ export function VotingPage() {
   const castVote = useCastVote(event.id)
   const { data: people = [] } = useRoster(event.id)
   const { data: units = [] } = useUnits(event.id)
-
-  // Live tallies only for categories the voter has already weighed in on.
-  const votedCategoryIds = useMemo(() => {
-    if (!votedMap) return []
-    return [...new Set([...votedMap.values()].map((v) => v.category_id))].sort()
-  }, [votedMap])
-  const counts = useVoteCountsMany(votedCategoryIds)
 
   /** Candidates keyed by slot: employment group, or division id for units. */
   const candidatesFor = useMemo(() => {
@@ -509,7 +497,6 @@ export function VotingPage() {
                   {slots.map((slot) => {
                     const key = slotKey(category.id, slot)
                     const voted = votedMap.get(key) ?? null
-                    const categoryCounts = counts.byCategory.get(category.id)
                     return (
                       <BallotSection
                         key={key}
@@ -533,12 +520,6 @@ export function VotingPage() {
                             return next
                           })
                         }
-                        counts={categoryCounts?.filter(
-                          (c) =>
-                            (c.section ?? null) === slot.section &&
-                            (c.division_id ?? null) === slot.divisionId,
-                        )}
-                        countsLoading={counts.isLoading && !categoryCounts}
                         disabled={submitting}
                       />
                     )
