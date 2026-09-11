@@ -33,10 +33,10 @@ import { matchesTokens, normalizeForSearch, searchTokens } from "@/lib/search"
 import { supabase } from "@/lib/supabase"
 import {
   EMPLOYMENT_GROUP_LABELS,
-  type Division,
   type RosterPerson,
   type Unit,
 } from "@/lib/types"
+import { DivisionsEditor, useAdminDivisions } from "./divisions-editor"
 import { RosterImport } from "./roster-import"
 
 function useAdminRoster(eventId: string) {
@@ -50,21 +50,6 @@ function useAdminRoster(eventId: string) {
         .order("full_name")
       if (error) throw error
       return data as RosterPerson[]
-    },
-  })
-}
-
-function useAdminDivisions(eventId: string) {
-  return useQuery({
-    queryKey: ["admin", "divisions", eventId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("divisions")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("sort_order")
-      if (error) throw error
-      return data as Division[]
     },
   })
 }
@@ -217,6 +202,8 @@ export function RosterManager({ eventId }: { eventId: string }) {
           )}
         </CardContent>
       </Card>
+
+      <DivisionsEditor eventId={eventId} units={units} />
 
       <Card>
         <CardHeader>
