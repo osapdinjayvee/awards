@@ -39,6 +39,9 @@ import {
 import { DivisionsEditor, useAdminDivisions } from "./divisions-editor"
 import { RosterImport } from "./roster-import"
 
+/** Radix rejects "" as a SelectItem value, so unassigned needs a sentinel. */
+const NO_DIVISION = "__none__"
+
 function useAdminRoster(eventId: string) {
   return useQuery({
     queryKey: ["admin", "roster", eventId],
@@ -121,6 +124,27 @@ export function RosterManager({ eventId }: { eventId: string }) {
       toast.success("Units saved.")
     },
     onError: () => toast.error("Could not save units."),
+  })
+
+  const moveUnit = useMutation({
+    mutationFn: async ({
+      id,
+      divisionId,
+    }: {
+      id: string
+      divisionId: string | null
+    }) => {
+      const { error } = await supabase
+        .from("units")
+        .update({ division_id: divisionId })
+        .eq("id", id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "units", eventId] })
+      qc.invalidateQueries({ queryKey: ["units", eventId] })
+    },
+    onError: () => toast.error("Could not move the unit."),
   })
 
   const removeUnit = useMutation({
@@ -235,19 +259,48 @@ export function RosterManager({ eventId }: { eventId: string }) {
                 >
                   {group.name} ({inGroup.length})
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="divide-y rounded-md border">
                   {inGroup.map((u) => (
-                    <Badge key={u.id} variant="secondary" className="gap-1 pr-1">
-                      {u.name}
-                      <button
-                        type="button"
+                    <div key={u.id} className="flex items-center gap-2 p-2">
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {u.name}
+                      </span>
+                      <Select
+                        value={u.division_id ?? NO_DIVISION}
+                        onValueChange={(v) =>
+                          moveUnit.mutate({
+                            id: u.id,
+                            divisionId: v === NO_DIVISION ? null : v,
+                          })
+                        }
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className="w-48 sm:w-64"
+                          aria-label={`Division for ${u.name}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(divisions ?? []).map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={NO_DIVISION}>
+                            No division — not votable
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         aria-label={`Remove ${u.name}`}
-                        className="rounded-full p-0.5 hover:bg-destructive/20"
                         onClick={() => removeUnit.mutate(u.id)}
                       >
-                        <Trash2 className="size-3" />
-                      </button>
-                    </Badge>
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </div>
                   ))}
                 </div>
               </div>
