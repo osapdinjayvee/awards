@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { supabase } from "@/lib/supabase"
+import { fetchAllRows, supabase } from "@/lib/supabase"
 import { type Division, type Unit } from "@/lib/types"
 
 export function useAdminDivisions(eventId: string) {
@@ -47,14 +47,18 @@ function useDivisionVoteCounts(eventId: string) {
   return useQuery({
     queryKey: ["admin", "division-votes", eventId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("votes")
-        .select("division_id")
-        .eq("event_id", eventId)
-        .not("division_id", "is", null)
-      if (error) throw error
+      const data = await fetchAllRows<{ division_id: string }>((from, to) =>
+        supabase
+          .from("votes")
+          .select("division_id")
+          .eq("event_id", eventId)
+          .not("division_id", "is", null)
+          .order("id")
+          .range(from, to)
+          .overrideTypes<{ division_id: string }[], { merge: false }>(),
+      )
       const counts = new Map<string, number>()
-      for (const v of data as { division_id: string }[]) {
+      for (const v of data) {
         counts.set(v.division_id, (counts.get(v.division_id) ?? 0) + 1)
       }
       return counts

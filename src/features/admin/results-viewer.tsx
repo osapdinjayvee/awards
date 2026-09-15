@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toCsv, downloadCsv } from "@/lib/csv"
-import { supabase } from "@/lib/supabase"
+import { fetchAllRows, supabase } from "@/lib/supabase"
 import {
   EMPLOYMENT_GROUP_LABELS,
   slotKey,
@@ -48,12 +48,17 @@ function useResults(eventId: string) {
           .select("*")
           .eq("event_id", eventId)
           .order("sort_order"),
-        supabase
-          .from("votes")
-          .select(
-            "category_id, section, division_id, nominee_person_id, nominee_unit_id, roster_people(full_name, position), units(name)",
-          )
-          .eq("event_id", eventId),
+        fetchAllRows<VoteRow>((from, to) =>
+          supabase
+            .from("votes")
+            .select(
+              "category_id, section, division_id, nominee_person_id, nominee_unit_id, roster_people(full_name, position), units(name)",
+            )
+            .eq("event_id", eventId)
+            .order("id")
+            .range(from, to)
+            .overrideTypes<VoteRow[], { merge: false }>(),
+        ),
         supabase
           .from("voters")
           .select("id", { count: "exact", head: true })
@@ -61,11 +66,10 @@ function useResults(eventId: string) {
       ])
       if (cats.error) throw cats.error
       if (divisions.error) throw divisions.error
-      if (votes.error) throw votes.error
       return {
         categories: cats.data as AwardCategory[],
         divisions: divisions.data as Division[],
-        votes: votes.data as unknown as VoteRow[],
+        votes,
         voterCount: voters.count ?? 0,
       }
     },
