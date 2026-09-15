@@ -147,7 +147,7 @@ export function ResultsViewer({ event }: { event: AwardEvent }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {totalVotes} ballot selections recorded · {data.voterCount} authorized voters
+          {totalVotes} vote selections across all sections · {data.voterCount} authorized voters
         </p>
         <div className="flex gap-2">
           <Button
@@ -179,7 +179,7 @@ export function ResultsViewer({ event }: { event: AwardEvent }) {
               <CardTitle className="flex flex-wrap items-baseline gap-x-2 text-base">
                 {s.cat.name}
                 <span className="text-sm font-normal text-muted-foreground">
-                  · {s.label} · {sectionTotal} section vote{sectionTotal === 1 ? "" : "s"}
+                  · {sectionTotal} vote{sectionTotal === 1 ? "" : "s"} from {s.label} voters
                 </span>
               </CardTitle>
             </CardHeader>
